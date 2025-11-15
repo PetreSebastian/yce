@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BattleTech Horror Video Generator - HYBRID</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a0a0f 50%, #2a0a14 100%);
+            min-height: 100vh;
+        }
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #dc2626;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        .glow {
+            box-shadow: 0 0 20px rgba(220, 38, 38, 0.5);
+        }
+    </style>
+</head>
+<body class="p-8">
+    <div class="max-w-6xl mx-auto">
+        <div class="bg-gray-900 rounded-lg shadow-2xl p-8 border-2 border-red-900 glow">
+            <!-- Header -->
+            <div class="mb-8">
+                <h1 class="text-5xl font-bold text-red-600 mb-2 flex items-center gap-3">
+                    ⚔️ BATTLETECH HORROR VIDEO GENERATOR
+                </h1>
+                <p class="text-gray-400 text-lg">SALVAGE RECORDINGS - Automated Production System</p>
+                <p class="text-red-500 text-sm mt-2">🎬 Full HD 16:9 | EC Comics Horror Style | GenAIPro TTS</p>
+            </div>
+
+            <!-- Error Display -->
+            <div id="errorBox" class="hidden bg-red-500/20 border-2 border-red-500 text-red-200 p-4 rounded-lg mb-6"></div>
+
+            <!-- Step 1: Title Input -->
+            <div id="step1" class="bg-gray-800 border-2 border-gray-700 p-6 rounded-lg mb-6">
+                <h2 class="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                    📝 STEP 1: Video Title
+                </h2>
+                <input
+                    type="text"
+                    id="videoTitle"
+                    placeholder="Example: The Midnight Mechanic"
+                    class="w-full px-4 py-3 bg-gray-700 text-white text-lg rounded-lg border-2 border-gray-600 focus:border-red-600 focus:outline-none"
+                />
+                <p class="text-gray-400 text-sm mt-2">Enter a title for your BattleTech horror story</p>
+            </div>
+
+            <!-- Step 2: Script Generation Instructions -->
+            <div id="step2" class="bg-gray-800 border-2 border-gray-700 p-6 rounded-lg mb-6">
+                <h2 class="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                    🤖 STEP 2: Generate Script
+                </h2>
+
+                <!-- Auto-Generate Section -->
+                <div class="bg-green-900/30 border-2 border-green-700 p-4 rounded-lg mb-4">
+                    <p class="text-green-200 font-semibold mb-3">✨ AUTOMATIC GENERATION (Recommended):</p>
+
+                    <div class="mb-4">
+                        <label class="block text-white font-semibold mb-2">
+                            📊 Script Length: <span id="wordCountDisplay">6000</span> words
+                        </label>
+                        <input
+                            type="range"
+                            id="wordCountSlider"
+                            min="3000"
+                            max="12000"
+                            step="500"
+                            value="6000"
+                            class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+                        />
+                        <div class="flex justify-between text-gray-400 text-xs mt-1">
+                            <span>3k (short)</span>
+                            <span>6k (medium)</span>
+                            <span>12k (long)</span>
+                        </div>
+                    </div>
+
+                    <button
+                        id="autoGenerateScriptBtn"
+                        class="w-full bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg flex items-center justify-center gap-3 transition-all"
+                    >
+                        ⚡ AUTO-GENERATE SCRIPT WITH GEMINI (FREE!)
+                    </button>
+                    <p class="text-green-300 text-sm mt-2">Uses Groq Llama 3.1 70B - completely free, ultra-fast generation!</p>
+                </div>
+
+                <!-- OR Divider -->
+                <div class="flex items-center gap-4 my-4">
+                    <div class="flex-1 border-t-2 border-gray-600"></div>
+                    <span class="text-gray-400 font-semibold">OR</span>
+                    <div class="flex-1 border-t-2 border-gray-600"></div>
+                </div>
+
+                <!-- Manual Generation Section -->
+                <div id="scriptInstructions" class="space-y-4">
+                    <div class="bg-red-900/30 border-2 border-red-700 p-4 rounded-lg">
+                        <p class="text-red-200 font-semibold mb-2">📝 MANUAL GENERATION:</p>
+                        <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
+                            <li>Go to your <strong class="text-red-400">Claude chat</strong> (this conversation)</li>
+                            <li>Send: <code class="bg-gray-800 px-2 py-1 rounded text-xs">"Generate BattleTech horror script for: [YOUR TITLE]"</code></li>
+                            <li>Wait for Claude to generate the full script</li>
+                            <li>Copy the entire script text</li>
+                            <li>Paste it in the box below</li>
+                        </ol>
+                    </div>
+
+                    <button
+                        id="openClaudeBtn"
+                        class="w-full bg-purple-700 hover:bg-purple-800 text-white font-bold py-3 px-6 rounded-lg flex items-center justify-center gap-3 transition-all"
+                    >
+                        💬 Open Claude Chat (Same Window)
+                    </button>
+
+                    <div class="border-t-2 border-gray-700 pt-4">
+                        <label class="block text-white font-semibold mb-2">
+                            📋 Paste Generated Script Here:
+                        </label>
+                        <textarea
+                            id="scriptInput"
+                            placeholder="Paste the complete script generated by Claude here..."
+                            class="w-full px-4 py-3 bg-gray-700 text-white rounded-lg border-2 border-gray-600 focus:border-red-600 focus:outline-none h-64 resize-y font-mono text-sm"
+                        ></textarea>
+                        <p id="scriptLength" class="text-gray-400 text-sm mt-2">0 characters</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: Configuration -->
+            <div id="step3" class="bg-gray-800 border-2 border-gray-700 p-6 rounded-lg mb-6">
+                <h2 class="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                    ⚙️ STEP 3: Video Configuration
+                </h2>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-white font-semibold mb-2">
+                            🖼️ Number of Images: <span id="imageCountDisplay">30</span>
+                        </label>
+                        <input
+                            type="range"
+                            id="imageCount"
+                            min="5"
+                            max="50"
+                            value="30"
+                            class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+                        />
+                        <div class="flex justify-between text-gray-400 text-sm mt-1">
+                            <span>5</span>
+                            <span>30</span>
+                            <span>50</span>
+                        </div>
+                    </div>
+
+                    <!-- Image Generation Method -->
+                    <div class="border-t-2 border-gray-700 pt-4">
+                        <label class="block text-white font-semibold mb-3">
+                            🖼️ Image Source:
+                        </label>
+                        <div class="flex gap-2 mb-4">
+                            <button id="useAutoGeneration" class="bg-blue-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-blue-600 text-xs">
+                                🤖 Auto-Generate
+                            </button>
+                            <button id="useManualUpload" class="bg-green-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-green-600 text-xs">
+                                📁 Upload Images
+                            </button>
+                            <button id="usePromptGeneration" class="bg-purple-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-purple-600 text-xs">
+                                📝 Generate Prompts
+                            </button>
+                        </div>
+
+                        <!-- Prompt Generation Section -->
+                        <div id="promptGenerationSection" class="hidden">
+                            <div class="bg-purple-900/20 border border-purple-600 rounded-lg p-4 mb-4">
+                                <div class="mb-4">
+                                    <label class="block text-white font-semibold mb-2">
+                                        🎯 Number of Image Prompts: <span id="promptCountDisplay">10</span>
+                                    </label>
+                                    <input
+                                        type="range"
+                                        id="promptCount"
+                                        min="1"
+                                        max="30"
+                                        value="10"
+                                        class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+                                    />
+                                    <div class="flex justify-between text-gray-400 text-sm mt-1">
+                                        <span>1</span>
+                                        <span>10</span>
+                                        <span>30</span>
+                                    </div>
+                                </div>
+
+                                <button
+                                    id="generatePromptsBtn"
+                                    class="w-full bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition-all hover:bg-purple-600 mb-3"
+                                >
+                                    🎨 Generate Image Prompts from Script
+                                </button>
+
+                                <div id="promptResults" class="hidden">
+                                    <label class="block text-white font-semibold mb-2">✨ Generated Image Prompts:</label>
+                                    <textarea
+                                        id="generatedPrompts"
+                                        class="w-full h-40 p-3 bg-gray-700 text-white rounded border border-gray-600 text-sm font-mono"
+                                        placeholder="Generated prompts will appear here..."
+                                        readonly
+                                    ></textarea>
+                                    <p class="text-purple-300 text-xs mt-2">
+                                        📋 Copy these prompts to use in Bing Creator, Leonardo.ai, etc.
+                                        <br>🎨 Or edit them and paste back for custom image generation!
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Manual Upload Section -->
+                        <div id="manualUploadSection" class="hidden">
+                            <div class="bg-green-900/20 border border-green-600 rounded-lg p-4 mb-4">
+                                <input
+                                    type="file"
+                                    id="manualImages"
+                                    multiple
+                                    accept="image/*"
+                                    class="w-full p-2 bg-gray-700 text-white rounded border border-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-green-600 file:text-white hover:file:bg-green-500"
+                                />
+                                <p class="text-green-300 text-xs mt-2">
+                                    📁 Upload 1-20 images. App will repeat them to fill entire audio duration.
+                                    <br>🎨 Generate free with: Bing Creator, Leonardo.ai, Adobe Firefly
+                                </p>
+                                <div id="uploadPreview" class="mt-3 text-sm text-gray-400">
+                                    No images selected yet
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Image Provider Toggle -->
+                    <div class="border-t-2 border-gray-700 pt-4">
+                        <label class="block text-white font-semibold mb-3">
+                            🎨 Image Provider:
+                        </label>
+                        <div class="grid grid-cols-4 gap-2">
+                            <button
+                                id="providerFal"
+                                class="bg-orange-700 text-white font-bold py-2 px-3 rounded-lg transition-all text-xs"
+                            >
+                                ⚡ Fal.ai
+                            </button>
+                            <button
+                                id="providerStability"
+                                class="bg-gray-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-gray-600 text-xs opacity-50 cursor-not-allowed"
+                                disabled
+                            >
+                                💜 Stability (NO $)
+                            </button>
+                            <button
+                                id="providerPollinations"
+                                class="bg-gray-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-gray-600 text-xs opacity-50 cursor-not-allowed"
+                                disabled
+                            >
+                                🌸 Pollinations (DOWN)
+                            </button>
+                            <button
+                                id="providerGemini"
+                                class="bg-gray-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-gray-600 text-xs opacity-50 cursor-not-allowed"
+                                disabled
+                            >
+                                ⭐ Gemini (N/A)
+                            </button>
+                        </div>
+                        <p id="providerNote" class="text-orange-300 text-xs mt-2">
+                            ⚡ Using Fal.ai Flux Schnell - add $5-10 credit to continue generating images
+                        </p>
+                        <p class="text-yellow-400 text-xs mt-1">
+                            💰 Cost: $0.04/image | 10 images = $0.40 | Add credit at fal.ai to continue
+                        </p>
+                    </div>
+
+                    <!-- Manual Image Upload Section -->
+                    <div class="border-t-2 border-gray-700 pt-4">
+                        <div class="flex items-center gap-4 mb-4">
+                            <button id="useAutoGeneration" class="bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-all hover:bg-blue-600 text-sm">
+                                🤖 Auto-Generate with AI
+                            </button>
+                            <button id="useManualUpload" class="bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-all hover:bg-green-600 text-sm">
+                                📁 Upload My Own Images
+                            </button>
+                        </div>
+
+                        <!-- Manual Upload Area (Hidden by default) -->
+                        <div id="manualUploadArea" class="hidden">
+                            <div class="bg-green-900/20 border-2 border-green-700 p-4 rounded-lg">
+                                <h4 class="text-green-400 font-semibold mb-3">📁 Upload Your Images:</h4>
+
+                                <div class="mb-4">
+                                    <input
+                                        type="file"
+                                        id="manualImageUpload"
+                                        multiple
+                                        accept="image/*"
+                                        class="w-full p-3 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-green-500 focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-green-700 file:text-white hover:file:bg-green-600"
+                                    />
+                                    <p class="text-gray-400 text-sm mt-2">
+                                        💡 Upload 5-20 images. Images will be used in order for video scenes.
+                                        <br>🖼️ Recommended: 1920x1080 or 16:9 aspect ratio for best results.
+                                        <br>🎨 Generate your images with: Bing Image Creator, Leonardo.ai, Adobe Firefly, etc.
+                                    </p>
+                                </div>
+
+                                <!-- Upload Preview Grid -->
+                                <div id="uploadPreviewGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 hidden">
+                                    <!-- Preview thumbnails will appear here -->
+                                </div>
+
+                                <div id="uploadStatus" class="text-center text-gray-400 text-sm">
+                                    📤 No images uploaded yet. Select images above to preview them here.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-700 p-4 rounded-lg">
+                        <p class="text-gray-300">
+                            <strong class="text-red-400">Voice:</strong> Richard "Whiskey-Rich" Mason - Deep & Velvety
+                        </p>
+                        <p class="text-gray-300">
+                            <strong class="text-red-400">Style:</strong> 1950s EC Comics Horror
+                        </p>
+                        <p class="text-gray-300">
+                            <strong class="text-red-400">Resolution:</strong> 1920x1080 (16:9 Full HD)
+                        </p>
+                        <p class="text-gray-300">
+                            <strong class="text-red-400">Effects:</strong> Zoom, Pan, Ken Burns + Particles
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 4: Audio Options -->
+            <div id="step4" class="bg-gray-800 border-2 border-gray-700 p-6 rounded-lg mb-6">
+                <h2 class="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                    🎙️ STEP 4: Audio Options
+                </h2>
+
+                <div class="space-y-4">
+                    <!-- Audio Mode Toggle -->
+                    <div class="flex gap-4 mb-4">
+                        <button
+                            id="audioModeGenerate"
+                            class="flex-1 bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-all"
+                        >
+                            🤖 Generate New Voiceover
+                        </button>
+                        <button
+                            id="audioModeUpload"
+                            class="flex-1 bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-all hover:bg-gray-600"
+                        >
+                            📁 Upload Existing Audio
+                        </button>
+                    </div>
+
+                    <!-- Generate Audio Section -->
+                    <div id="generateAudioSection" class="bg-gray-700 p-4 rounded-lg">
+                        <p class="text-gray-300 mb-2">
+                            <strong class="text-yellow-400">✨ Generate voiceover from script</strong>
+                        </p>
+                        <p class="text-gray-400 text-sm">
+                            Will use GenAIPro TTS with Richard "Whiskey-Rich" Mason voice
+                        </p>
+                        <p class="text-gray-400 text-sm mt-1">
+                            ⏱️ Processing time: ~2-3 minutes
+                        </p>
+                    </div>
+
+                    <!-- Upload Audio Section -->
+                    <div id="uploadAudioSection" class="hidden bg-gray-700 p-4 rounded-lg">
+                        <label class="block text-white font-semibold mb-2">
+                            📤 Upload Audio File (MP3):
+                        </label>
+                        <input
+                            type="file"
+                            id="audioFileInput"
+                            accept="audio/mp3,audio/mpeg"
+                            class="block w-full text-sm text-gray-300
+                                file:mr-4 file:py-2 file:px-4
+                                file:rounded-lg file:border-0
+                                file:text-sm file:font-semibold
+                                file:bg-red-600 file:text-white
+                                hover:file:bg-red-700 cursor-pointer"
+                        />
+                        <p class="text-gray-400 text-sm mt-2">
+                            💡 Use a previously generated voiceover to save time and credits
+                        </p>
+                        <p id="audioFileName" class="text-green-400 text-sm mt-2 hidden">
+                            ✅ File loaded: <span id="audioFileNameText"></span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Generate Button -->
+            <button
+                id="generateBtn"
+                disabled
+                class="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-700 text-white font-bold py-4 px-6 rounded-lg flex items-center justify-center gap-3 transition-all text-xl glow disabled:opacity-50 mb-4"
+            >
+                🎬 GENERATE COMPLETE VIDEO
+            </button>
+
+            <!-- Thumbnail Generator Button -->
+            <button
+                id="generateThumbnailBtn"
+                class="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-6 rounded-lg flex items-center justify-center gap-3 transition-all"
+            >
+                🖼️ GENERATE THUMBNAIL ONLY
+            </button>
+            <p class="text-gray-400 text-sm text-center mt-2">Generate a single thumbnail image based on your script (no video)</p>
+
+            <!-- Thumbnail Preview Area -->
+            <div id="thumbnailPreview" class="hidden mt-4 bg-gray-800 border-2 border-green-700 p-4 rounded-lg">
+                <p class="text-green-400 font-semibold mb-3 text-center">✅ Thumbnail Generated!</p>
+                <img id="thumbnailImage" src="" alt="Generated Thumbnail" class="w-full rounded-lg mb-3" />
+                <div class="flex gap-2">
+                    <a
+                        id="thumbnailDownloadBtn"
+                        href=""
+                        download=""
+                        target="_blank"
+                        class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg text-center transition-all"
+                    >
+                        💾 Download
+                    </a>
+                    <a
+                        id="thumbnailOpenBtn"
+                        href=""
+                        target="_blank"
+                        class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg text-center transition-all"
+                    >
+                        🔗 Open in New Tab
+                    </a>
+                </div>
+            </div>
+
+            <!-- Progress Section -->
+            <div id="progressSection" class="hidden mt-6 bg-gray-800 border-2 border-gray-700 p-6 rounded-lg">
+                <h3 class="text-xl font-semibold text-white mb-4">📊 Generation Progress</h3>
+
+                <div class="space-y-4">
+                    <!-- Overall Progress -->
+                    <div>
+                        <div class="flex justify-between text-white mb-2">
+                            <span id="currentStep">Initializing...</span>
+                            <span id="overallProgress">0%</span>
+                        </div>
+                        <div class="w-full bg-gray-600 rounded-full h-4">
+                            <div id="overallProgressBar" class="bg-red-600 h-4 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Step Details -->
+                    <div class="space-y-2 text-sm">
+                        <div id="step-parse" class="flex items-center gap-2 text-gray-400">
+                            <span class="text-xl">⏸️</span> <span>Parse script & extract scenes</span>
+                        </div>
+                        <div id="step-images" class="flex items-center gap-2 text-gray-400">
+                            <span class="text-xl">⏸️</span> <span>Generate images (<span id="imageProgress">0/30</span>)</span>
+                        </div>
+                        <div id="step-voiceover" class="flex items-center gap-2 text-gray-400">
+                            <span class="text-xl">⏸️</span> <span>Generate voiceover</span>
+                        </div>
+                        <div id="step-video" class="flex items-center gap-2 text-gray-400">
+                            <span class="text-xl">⏸️</span> <span>Render video with effects</span>
+                        </div>
+                    </div>
+
+                    <p class="text-gray-400 text-sm mt-4">⏱️ <span id="timeEstimate">Estimated time: calculating...</span></p>
+                </div>
+            </div>
+
+            <!-- Success Section -->
+            <div id="successSection" class="hidden mt-6 bg-green-900/30 border-2 border-green-600 p-6 rounded-lg">
+                <h3 class="text-2xl font-bold text-green-400 mb-2 flex items-center gap-2">
+                    ✅ VIDEO GENERATED SUCCESSFULLY!
+                </h3>
+                <p class="text-green-200 mb-4">Your BattleTech horror video is ready for download.</p>
+                <p class="text-gray-300 text-sm">📁 File: <span class="font-mono bg-gray-800 px-2 py-1 rounded">final-video-with-audio.mp4</span></p>
+                <p class="text-gray-300 text-sm mt-2">📊 Resolution: 1920x1080 (Full HD 16:9)</p>
+                <button
+                    id="newVideoBtn"
+                    class="mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg transition-all"
+                >
+                    🎬 Create Another Video
+                </button>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-6 text-center text-gray-500 text-sm">
+            <p>🤖 Powered by Claude AI + GenAIPro TTS + Pollinations.ai + ffmpeg</p>
+            <p class="mt-1">⚔️ BattleTech Horror Content Generator v1.0</p>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let state = {
+            videoTitle: '',
+            script: '',
+            imageCount: 30,
+            wordCount: 6000,
+            generatedImages: [],
+            imageEffects: [],
+            audioBase64: '',
+            audioDuration: 0,
+            audioMode: 'generate', // 'generate' or 'upload'
+            uploadedAudioFile: null,
+            imageProvider: 'fal' // Switch back to Fal.ai - user can add $5-10 credit
+        };
+
+        // DOM Elements
+        const videoTitleInput = document.getElementById('videoTitle');
+        const scriptInput = document.getElementById('scriptInput');
+        const scriptLength = document.getElementById('scriptLength');
+        const imageCountSlider = document.getElementById('imageCount');
+        const imageCountDisplay = document.getElementById('imageCountDisplay');
+        const wordCountSlider = document.getElementById('wordCountSlider');
+        const wordCountDisplay = document.getElementById('wordCountDisplay');
+        const autoGenerateScriptBtn = document.getElementById('autoGenerateScriptBtn');
+        const generateBtn = document.getElementById('generateBtn');
+        const openClaudeBtn = document.getElementById('openClaudeBtn');
+        const progressSection = document.getElementById('progressSection');
+        const successSection = document.getElementById('successSection');
+        const errorBox = document.getElementById('errorBox');
+        const newVideoBtn = document.getElementById('newVideoBtn');
+
+        // Thumbnail button
+        const generateThumbnailBtn = document.getElementById('generateThumbnailBtn');
+
+        // Image provider elements
+        const providerStability = document.getElementById('providerStability');
+        const providerFal = document.getElementById('providerFal');
+        const providerPollinations = document.getElementById('providerPollinations');
+        const providerGemini = document.getElementById('providerGemini');
+        const providerNote = document.getElementById('providerNote');
+
+        // Manual image upload elements
+        const useAutoGeneration = document.getElementById('useAutoGeneration');
+        const useManualUpload = document.getElementById('useManualUpload');
+        const usePromptGeneration = document.getElementById('usePromptGeneration');
+        const manualUploadSection = document.getElementById('manualUploadSection');
+        const promptGenerationSection = document.getElementById('promptGenerationSection');
+        const manualImages = document.getElementById('manualImages');
+        const uploadPreview = document.getElementById('uploadPreview');
+        const promptCount = document.getElementById('promptCount');
+        const promptCountDisplay = document.getElementById('promptCountDisplay');
+        const generatePromptsBtn = document.getElementById('generatePromptsBtn');
+        const promptResults = document.getElementById('promptResults');
+        const generatedPrompts = document.getElementById('generatedPrompts');
+
+        // Add manual upload state
+        let currentMode = 'auto'; // 'auto', 'manual', 'prompts'
+        let uploadedImageFiles = [];
+        let extractedPrompts = [];
+
+        // Update prompt count display
+        promptCount.addEventListener('input', () => {
+            const count = parseInt(promptCount.value);
+            promptCountDisplay.textContent = count;
+        });
+
+        // Toggle between different image modes
+        useAutoGeneration.addEventListener('click', () => {
+            currentMode = 'auto';
+            useAutoGeneration.className = 'bg-blue-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-blue-600 text-xs';
+            useManualUpload.className = 'bg-gray-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-gray-600 text-xs';
+            usePromptGeneration.className = 'bg-gray-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-gray-600 text-xs';
+            manualUploadSection.classList.add('hidden');
+            promptGenerationSection.classList.add('hidden');
+            validateForm();
+        });
+
+        useManualUpload.addEventListener('click', () => {
+            currentMode = 'manual';
+            useManualUpload.className = 'bg-green-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-green-600 text-xs';
+            useAutoGeneration.className = 'bg-gray-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-gray-600 text-xs';
+            usePromptGeneration.className = 'bg-gray-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-gray-600 text-xs';
+            manualUploadSection.classList.remove('hidden');
+            promptGenerationSection.classList.add('hidden');
+            validateForm();
+        });
+
+        usePromptGeneration.addEventListener('click', () => {
+            currentMode = 'prompts';
+            usePromptGeneration.className = 'bg-purple-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-purple-600 text-xs';
+            useAutoGeneration.className = 'bg-gray-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-gray-600 text-xs';
+            useManualUpload.className = 'bg-gray-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-gray-600 text-xs';
+            manualUploadSection.classList.add('hidden');
+            promptGenerationSection.classList.remove('hidden');
+            validateForm();
+        });
+
+        // Generate prompts from script
+        generatePromptsBtn.addEventListener('click', async () => {
+            if (!state.script.trim()) {
+                showError('Please generate or enter a script first!');
+                return;
+            }
+
+            const targetPrompts = parseInt(promptCount.value);
+            generatePromptsBtn.disabled = true;
+            generatePromptsBtn.textContent = '🔄 Extracting scenes from script...';
+
+            try {
+                const response = await fetch('http://localhost:3000/api/extract-prompts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        script: state.script,
+                        promptCount: targetPrompts
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to extract prompts from script');
+                }
+
+                const data = await response.json();
+                extractedPrompts = data.prompts;
+
+                generatedPrompts.value = extractedPrompts.join('\n\n');
+                promptResults.classList.remove('hidden');
+
+                generatePromptsBtn.textContent = `✅ Generated ${extractedPrompts.length} Prompts!`;
+
+                setTimeout(() => {
+                    generatePromptsBtn.disabled = false;
+                    generatePromptsBtn.textContent = '🎨 Generate Image Prompts from Script';
+                }, 2000);
+
+            } catch (error) {
+                showError(`Prompt extraction failed: ${error.message}`);
+                generatePromptsBtn.disabled = false;
+                generatePromptsBtn.textContent = '🎨 Generate Image Prompts from Script';
+            }
+        });
+
+        function validateForm() {
+            const hasTitle = state.videoTitle.trim().length > 0;
+            const hasScript = state.script.trim().length > 0;
+            const hasImages = (currentMode === 'manual') ? uploadedImageFiles.length > 0 : true;
+
+            // Enable/disable generate button based on validation
+            if (hasTitle && hasScript && hasImages && !state.processing) {
+                generateVideoBtn.disabled = false;
+                generateVideoBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                generateVideoBtn.classList.add('hover:bg-purple-600');
+            } else {
+                generateVideoBtn.disabled = true;
+                generateVideoBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                generateVideoBtn.classList.remove('hover:bg-purple-600');
+            }
+        }
+
+        // Override image generation for manual mode
+        let originalGenerateVideoFunction = null;
+        manualImages.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) {
+                uploadPreview.textContent = 'No images selected yet';
+                uploadedImageFiles = [];
+                validateForm();
+                return;
+            }
+
+            uploadPreview.textContent = `📁 ${files.length} images selected. Processing...`;
+            uploadedImageFiles = [];
+
+            // Process each file
+            let processedCount = 0;
+            files.forEach((file, index) => {
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        uploadedImageFiles.push({
+                            name: file.name,
+                            dataUrl: e.target.result
+                        });
+                        processedCount++;
+
+                        if (processedCount === files.length) {
+                            uploadPreview.innerHTML = `✅ ${uploadedImageFiles.length} images ready! App will repeat them to fill ${state.imageCount} total images for video.`;
+                            validateForm();
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        });
+
+        // Audio mode elements
+        const audioModeGenerate = document.getElementById('audioModeGenerate');
+        const audioModeUpload = document.getElementById('audioModeUpload');
+        const generateAudioSection = document.getElementById('generateAudioSection');
+        const uploadAudioSection = document.getElementById('uploadAudioSection');
+        const audioFileInput = document.getElementById('audioFileInput');
+        const audioFileName = document.getElementById('audioFileName');
+        const audioFileNameText = document.getElementById('audioFileNameText');
+
+        // Utility Functions
+        function showError(message) {
+            errorBox.textContent = message;
+            errorBox.classList.remove('hidden');
+            setTimeout(() => errorBox.classList.add('hidden'), 8000);
+        }
+
+        function updateStepStatus(stepId, status) {
+            const stepEl = document.getElementById(`step-${stepId}`);
+            if (!stepEl) return;
+
+            const icon = stepEl.querySelector('.text-xl');
+            const text = stepEl.querySelector('span:last-child');
+
+            if (status === 'active') {
+                icon.textContent = '⏳';
+                stepEl.className = 'flex items-center gap-2 text-yellow-400';
+            } else if (status === 'complete') {
+                icon.textContent = '✅';
+                stepEl.className = 'flex items-center gap-2 text-green-400';
+            } else if (status === 'error') {
+                icon.textContent = '❌';
+                stepEl.className = 'flex items-center gap-2 text-red-400';
+            }
+        }
+
+        function getRandomEffect() {
+            // Only zoom effects for speed - 2-3x faster than pan/kenBurns
+            const effects = ['zoomIn', 'zoomOut'];
+            return effects[Math.floor(Math.random() * effects.length)];
+        }
+
+        // Event Listeners
+        videoTitleInput.addEventListener('input', (e) => {
+            state.videoTitle = e.target.value.trim();
+            validateForm();
+        });
+
+        scriptInput.addEventListener('input', (e) => {
+            state.script = e.target.value;
+            scriptLength.textContent = `${state.script.length.toLocaleString()} characters`;
+            validateForm();
+        });
+
+        imageCountSlider.addEventListener('input', (e) => {
+            state.imageCount = parseInt(e.target.value);
+            imageCountDisplay.textContent = state.imageCount;
+        });
+
+        wordCountSlider.addEventListener('input', (e) => {
+            state.wordCount = parseInt(e.target.value);
+            wordCountDisplay.textContent = state.wordCount.toLocaleString();
+        });
+
+        // Auto-generate script with Gemini
+        autoGenerateScriptBtn.addEventListener('click', async () => {
+            if (!state.videoTitle) {
+                showError('Please enter a video title first!');
+                videoTitleInput.focus();
+                return;
+            }
+
+            autoGenerateScriptBtn.disabled = true;
+            autoGenerateScriptBtn.innerHTML = '⏳ Generating script with Gemini...';
+
+            try {
+                const response = await fetch('http://localhost:3000/api/generate-script', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: state.videoTitle,
+                        wordCount: state.wordCount
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Script generation failed');
+                }
+
+                const data = await response.json();
+
+                // Auto-paste into textarea
+                scriptInput.value = data.script;
+                state.script = data.script;
+                scriptLength.textContent = `${data.script.length.toLocaleString()} characters (${data.actualWords.toLocaleString()} words)`;
+
+                autoGenerateScriptBtn.innerHTML = '✅ Script Generated!';
+                autoGenerateScriptBtn.classList.remove('bg-green-700');
+                autoGenerateScriptBtn.classList.add('bg-green-600');
+
+                setTimeout(() => {
+                    autoGenerateScriptBtn.disabled = false;
+                    autoGenerateScriptBtn.innerHTML = '⚡ AUTO-GENERATE SCRIPT WITH GROQ (FREE!)';
+                    autoGenerateScriptBtn.classList.remove('bg-green-600');
+                    autoGenerateScriptBtn.classList.add('bg-green-700');
+                }, 3000);
+
+                validateForm();
+
+            } catch (error) {
+                showError(`Script generation error: ${error.message}`);
+                autoGenerateScriptBtn.disabled = false;
+                autoGenerateScriptBtn.innerHTML = '⚡ AUTO-GENERATE SCRIPT WITH GEMINI (FREE!)';
+            }
+        });
+
+        // Image provider toggle
+        providerStability.addEventListener('click', () => {
+            state.imageProvider = 'stability';
+            providerStability.className = 'bg-purple-700 text-white font-bold py-2 px-3 rounded-lg transition-all text-xs';
+            providerPollinations.className = 'bg-gray-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-gray-600 text-xs opacity-50 cursor-not-allowed';
+            providerFal.className = 'bg-gray-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-gray-600 text-xs opacity-50 cursor-not-allowed';
+            providerGemini.className = 'bg-gray-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-gray-600 text-xs opacity-50 cursor-not-allowed';
+            providerNote.textContent = '⚡ Stability AI SD3 Turbo - $25 FREE, 16:9 native, most reliable provider!';
+        });
+
+        // Audio mode toggle
+        audioModeGenerate.addEventListener('click', () => {
+            state.audioMode = 'generate';
+            state.uploadedAudioFile = null;
+
+            audioModeGenerate.className = 'flex-1 bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-all';
+            audioModeUpload.className = 'flex-1 bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-all hover:bg-gray-600';
+
+            generateAudioSection.classList.remove('hidden');
+            uploadAudioSection.classList.add('hidden');
+
+            validateForm();
+        });
+
+        audioModeUpload.addEventListener('click', () => {
+            state.audioMode = 'upload';
+
+            audioModeUpload.className = 'flex-1 bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-all';
+            audioModeGenerate.className = 'flex-1 bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-all hover:bg-gray-600';
+
+            uploadAudioSection.classList.remove('hidden');
+            generateAudioSection.classList.add('hidden');
+
+            validateForm();
+        });
+
+        // Audio file upload
+        audioFileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (!file.type.includes('audio')) {
+                showError('Please upload an audio file (MP3)');
+                return;
+            }
+
+            // Read file as base64
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                state.uploadedAudioFile = event.target.result;
+                state.audioBase64 = event.target.result;
+
+                // Get audio duration
+                const audio = new Audio();
+                audio.src = state.audioBase64;
+                audio.onloadedmetadata = () => {
+                    state.audioDuration = Math.floor(audio.duration);
+                    audioFileNameText.textContent = `${file.name} (${state.audioDuration}s)`;
+                    audioFileName.classList.remove('hidden');
+                    validateForm();
+                };
+            };
+            reader.readAsDataURL(file);
+        });
+
+        openClaudeBtn.addEventListener('click', () => {
+            if (!state.videoTitle) {
+                showError('Please enter a video title first!');
+                videoTitleInput.focus();
+                return;
+            }
+
+            alert(`📋 Instructions:\n\n1. Stay on this page\n2. In your Claude chat, send:\n   "Generate BattleTech horror script for: ${state.videoTitle}"\n3. Wait for the complete script\n4. Copy and paste it in the script box below\n5. Click GENERATE COMPLETE VIDEO`);
+        });
+
+        function validateForm() {
+            let isValid = state.videoTitle.length > 0;
+
+            // If manual mode with uploaded images, don't require script
+            if (currentMode === 'manual' && uploadedImageFiles.length > 0) {
+                // Manual mode: only need title + images
+                isValid = state.videoTitle.length > 0;
+            } else {
+                // Auto mode: need title + script
+                isValid = state.videoTitle.length > 0 && state.script.length > 1000;
+            }
+
+            // If upload mode, also check if audio is uploaded
+            if (state.audioMode === 'upload') {
+                const audioInput = document.getElementById('audioFile');
+                isValid = isValid && audioInput && audioInput.files && audioInput.files.length > 0;
+            }
+
+            generateBtn.disabled = !isValid;
+        }
+
+        newVideoBtn.addEventListener('click', () => {
+            location.reload();
+        });
+
+        // Thumbnail generation
+        generateThumbnailBtn.addEventListener('click', async () => {
+            if (!state.script || state.script.length < 1000) {
+                showError('Please paste your script first!');
+                return;
+            }
+
+            generateThumbnailBtn.disabled = true;
+            generateThumbnailBtn.innerHTML = '⏳ Generating thumbnail...';
+
+            // Hide preview if shown
+            document.getElementById('thumbnailPreview').classList.add('hidden');
+
+            try {
+                // Parse script to get first scene
+                const parseResponse = await fetch('http://localhost:3000/api/parse-script', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        script: state.script,
+                        targetImageCount: 1 // Just 1 image for thumbnail
+                    })
+                });
+
+                if (!parseResponse.ok) throw new Error('Failed to parse script');
+                const parseData = await parseResponse.json();
+
+                if (!parseData.prompts || parseData.prompts.length === 0) {
+                    throw new Error('No visual content found in script');
+                }
+
+                // Generate single thumbnail image using selected provider
+                const thumbnailPrompt = parseData.prompts[0];
+                console.log('Thumbnail prompt:', thumbnailPrompt);
+
+                let imageEndpoint;
+                if (state.imageProvider === 'stability') {
+                    imageEndpoint = 'http://localhost:3000/api/generate/stability';
+                } else if (state.imageProvider === 'fal') {
+                    imageEndpoint = 'http://localhost:3000/api/generate/fal';
+                } else if (state.imageProvider === 'gemini') {
+                    imageEndpoint = 'http://localhost:3000/api/generate/gemini';
+                } else {
+                    imageEndpoint = 'http://localhost:3000/api/generate/pollinations';
+                }
+
+                const imageResponse = await fetch(imageEndpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompts: [thumbnailPrompt]
+                    })
+                });
+
+                if (!imageResponse.ok) throw new Error('Thumbnail generation failed');
+                const imageData = await imageResponse.json();
+
+                const thumbnailUrl = imageData.images[0].image;
+
+                // Handle base64 vs URL differently
+                if (thumbnailUrl.startsWith('data:image')) {
+                    // Base64 image - use directly without download
+                    document.getElementById('thumbnailImage').src = thumbnailUrl;
+
+                    // For download, convert to blob URL
+                    const base64Data = thumbnailUrl.split(',')[1];
+                    const binaryData = atob(base64Data);
+                    const bytes = new Uint8Array(binaryData.length);
+                    for (let i = 0; i < binaryData.length; i++) {
+                        bytes[i] = binaryData.charCodeAt(i);
+                    }
+                    const blob = new Blob([bytes], { type: 'image/png' });
+                    const blobUrl = URL.createObjectURL(blob);
+
+                    const downloadFilename = `${state.videoTitle.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-thumbnail.png`;
+
+                    document.getElementById('thumbnailDownloadBtn').href = blobUrl;
+                    document.getElementById('thumbnailDownloadBtn').download = downloadFilename;
+                    document.getElementById('thumbnailOpenBtn').href = thumbnailUrl;
+                    document.getElementById('thumbnailPreview').classList.remove('hidden');
+
+                } else {
+                    // URL image - download via server as before
+                    const downloadResponse = await fetch('http://localhost:3000/api/download-thumbnail', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            imageUrl: thumbnailUrl,
+                            filename: `${state.videoTitle.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-thumbnail.png`
+                        })
+                    });
+
+                    if (!downloadResponse.ok) throw new Error('Failed to download thumbnail');
+                    const downloadData = await downloadResponse.json();
+
+                    // Show thumbnail preview using local server URL
+                    document.getElementById('thumbnailImage').src = downloadData.localUrl;
+                    document.getElementById('thumbnailDownloadBtn').href = downloadData.localUrl;
+                    document.getElementById('thumbnailDownloadBtn').download = downloadData.filename;
+                    document.getElementById('thumbnailOpenBtn').href = downloadData.localUrl;
+                    document.getElementById('thumbnailPreview').classList.remove('hidden');
+                }
+
+                generateThumbnailBtn.innerHTML = '✅ Thumbnail Generated!';
+                setTimeout(() => {
+                    generateThumbnailBtn.disabled = false;
+                    generateThumbnailBtn.innerHTML = '🖼️ GENERATE THUMBNAIL ONLY';
+                }, 3000);
+
+            } catch (error) {
+                showError(`Thumbnail error: ${error.message}`);
+                generateThumbnailBtn.disabled = false;
+                generateThumbnailBtn.innerHTML = '🖼️ GENERATE THUMBNAIL ONLY';
+            }
+        });
+
+        generateBtn.addEventListener('click', async () => {
+            if (!state.script || state.script.length < 1000) {
+                showError('Script is too short! Please paste the complete script generated by Claude.');
+                return;
+            }
+
+            // Start generation process
+            progressSection.classList.remove('hidden');
+            successSection.classList.add('hidden');
+            generateBtn.disabled = true;
+
+            document.getElementById('currentStep').textContent = 'Starting generation...';
+            document.getElementById('overallProgressBar').style.width = '5%';
+            document.getElementById('overallProgress').textContent = '5%';
+
+            try {
+                // Check server
+                const healthCheck = await fetch('http://localhost:3000/health');
+                if (!healthCheck.ok) {
+                    throw new Error('Backend server not running! Start with: npm start');
+                }
+
+                // Check if manual mode - SKIP script parsing entirely!
+                let imagePrompts; // Define outside the conditional
+
+                if (currentMode === 'manual' && uploadedImageFiles.length > 0) {
+                    console.log('📁 MANUAL MODE: Skipping script parsing - using uploaded images');
+
+                    // Skip parsing, go directly to manual image processing
+                    updateStepStatus('parse', 'complete');
+                    document.getElementById('overallProgressBar').style.width = '15%';
+                    document.getElementById('overallProgress').textContent = '15%';
+
+                    // Create dummy prompts (not used anyway in manual mode)
+                    imagePrompts = Array(state.imageCount).fill('Manual uploaded image');
+
+                } else {
+                    // AUTO/PROMPT MODE: Do normal script parsing
+                    updateStepStatus('parse', 'active');
+                    document.getElementById('currentStep').textContent = 'Parsing script and extracting scenes...';
+                    document.getElementById('overallProgressBar').style.width = '10%';
+                    document.getElementById('overallProgress').textContent = '10%';
+
+                    const parseResponse = await fetch('http://localhost:3000/api/parse-script', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            script: state.script,
+                            targetImageCount: state.imageCount
+                        })
+                    });
+
+                    if (!parseResponse.ok) throw new Error('Script parsing failed');
+                    const parseData = await parseResponse.json();
+                    imagePrompts = parseData.prompts;
+
+                    updateStepStatus('parse', 'complete');
+                    document.getElementById('overallProgressBar').style.width = '15%';
+                    document.getElementById('overallProgress').textContent = '15%';
+                }
+
+                // Step 2: Generate or use images based on mode
+                updateStepStatus('images', 'active');
+
+                let images = [];
+
+                if (currentMode === 'manual' && uploadedImageFiles.length > 0) {
+                    // MANUAL MODE: Use uploaded images, no API calls!
+                    console.log(`📁 MANUAL MODE: Using ${uploadedImageFiles.length} uploaded images`);
+                    document.getElementById('currentStep').textContent = `Using your ${uploadedImageFiles.length} uploaded images...`;
+
+                    // Repeat uploaded images to fill the target count
+                    for (let i = 0; i < state.imageCount; i++) {
+                        const sourceIndex = i % uploadedImageFiles.length;
+                        images.push(uploadedImageFiles[sourceIndex].dataUrl);
+                    }
+
+                    console.log(`✅ Manual mode: Using ${images.length} total images (${uploadedImageFiles.length} unique, repeated ${Math.ceil(state.imageCount/uploadedImageFiles.length)}x)`);
+
+                    state.generatedImages = images;
+                    state.imageEffects = images.map(() => getRandomEffect());
+
+                } else if (currentMode === 'prompts') {
+                    // PROMPT MODE: User should generate externally first
+                    throw new Error('Prompt mode detected. Please generate images using the extracted prompts, then switch to manual upload mode.');
+
+                } else {
+                    // AUTO MODE: Generate with AI APIs
+                    console.log(`🤖 AUTO MODE: Generating ${imagePrompts.length} images with ${state.imageProvider}`);
+                    document.getElementById('currentStep').textContent = `Generating ${imagePrompts.length} Full HD images with ${state.imageProvider}...`;
+
+                    let imageEndpoint;
+                    if (state.imageProvider === 'stability') {
+                        imageEndpoint = 'http://localhost:3000/api/generate/stability';
+                    } else if (state.imageProvider === 'fal') {
+                        imageEndpoint = 'http://localhost:3000/api/generate/fal';
+                    } else if (state.imageProvider === 'gemini') {
+                        imageEndpoint = 'http://localhost:3000/api/generate/gemini';
+                    } else {
+                        imageEndpoint = 'http://localhost:3000/api/generate/pollinations';
+                    }
+
+                    const imagesResponse = await fetch(imageEndpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompts: imagePrompts })
+                    });
+
+                    if (!imagesResponse.ok) {
+                        const errorData = await imagesResponse.json();
+                        throw new Error(errorData.error || 'Image generation failed');
+                    }
+                    const imagesData = await imagesResponse.json();
+
+                    state.generatedImages = imagesData.images.map(img => img.image);
+                    state.imageEffects = state.generatedImages.map(() => getRandomEffect());
+                }
+
+                updateStepStatus('images', 'complete');
+                document.getElementById('imageProgress').textContent = `${state.generatedImages.length}/${imagePrompts.length}`;
+                document.getElementById('overallProgressBar').style.width = '50%';
+                document.getElementById('overallProgress').textContent = '50%';
+
+                console.log('🚀 Starting Step 3: Audio handling...');
+
+                // FORCE CHECK FOR UPLOADED AUDIO FILE
+                const audioFileInput = document.getElementById('audioFile');
+                let hasAudioFile = false;
+                let audioFileName = '';
+
+                // Check multiple ways for uploaded audio
+                if (audioFileInput && audioFileInput.files && audioFileInput.files.length > 0) {
+                    hasAudioFile = true;
+                    audioFileName = audioFileInput.files[0].name;
+                    console.log(`✅ FOUND UPLOADED AUDIO: ${audioFileName}`);
+                } else {
+                    // Check if audio upload mode is selected and file is shown
+                    const audioFileNameElement = document.getElementById('audioFileNameText');
+                    if (audioFileNameElement && audioFileNameElement.textContent.includes('.mp3')) {
+                        hasAudioFile = true;
+                        audioFileName = audioFileNameElement.textContent;
+                        console.log(`✅ FOUND UPLOADED AUDIO FROM UI: ${audioFileName}`);
+                    }
+                }
+
+                console.log(`🔍 Final audio check: hasAudioFile = ${hasAudioFile}`);
+
+                if (hasAudioFile) {
+                    // USE UPLOADED AUDIO - NO TTS GENERATION!
+                    console.log('✅ USING UPLOADED AUDIO - SKIPPING TTS COMPLETELY!');
+                    updateStepStatus('voiceover', 'complete');
+                    document.getElementById('currentStep').textContent = `Using uploaded audio: ${audioFileName}`;
+
+                    // Use uploaded audio file
+                    if (audioFileInput && audioFileInput.files && audioFileInput.files.length > 0) {
+                        const audioFile = audioFileInput.files[0];
+                        const audioUrl = URL.createObjectURL(audioFile);
+                        state.audioBase64 = audioUrl;
+
+                        // Get actual audio duration
+                        const audio = new Audio();
+                        audio.src = audioUrl;
+                        await new Promise((resolve) => {
+                            audio.onloadedmetadata = () => {
+                                state.audioDuration = Math.floor(audio.duration);
+                                console.log(`🎵 Audio duration: ${state.audioDuration} seconds`);
+                                resolve();
+                            };
+                        });
+                    } else {
+                        // Fallback for long audio
+                        state.audioDuration = 3000; // 50 minutes default
+                        console.log(`🎵 Using default long duration: ${state.audioDuration} seconds`);
+                    }
+
+                    console.log('✅ Audio setup complete - NO TTS GENERATED!');
+
+                } else {
+                    // ONLY generate TTS if NO uploaded audio found
+                    console.log('🎙️ No uploaded audio found - generating TTS...');
+                    updateStepStatus('voiceover', 'active');
+                    document.getElementById('currentStep').textContent = 'Generating voiceover...';
+
+                    try {
+                        const voiceoverResponse = await fetch('http://localhost:3000/api/generate-voiceover', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ text: state.script })
+                        });
+
+                        if (!voiceoverResponse.ok) throw new Error('Voiceover generation failed');
+                        const voiceoverData = await voiceoverResponse.json();
+
+                        state.audioBase64 = voiceoverData.audioBase64;
+                        state.audioDuration = 120; // fallback
+
+                        updateStepStatus('voiceover', 'complete');
+                        console.log('✅ TTS generated');
+
+                    } catch (error) {
+                        console.error('❌ TTS Generation Error:', error);
+                        throw error;
+                    }
+                }
+
+                console.log('🔄 Setting progress to 70%...');
+                document.getElementById('overallProgressBar').style.width = '70%';
+                document.getElementById('overallProgress').textContent = '70%';
+                console.log('✅ Step 3 complete - moving to video rendering...');
+
+                // Step 4: Render video
+                updateStepStatus('video', 'active');
+                document.getElementById('currentStep').textContent = 'Rendering video with effects...';
+
+                const imageInterval = Math.floor(state.audioDuration / state.generatedImages.length);
+
+                const videoResponse = await fetch('http://localhost:3000/api/create-video', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        images: state.generatedImages,
+                        effects: state.imageEffects,
+                        audioBase64: state.audioBase64,
+                        imageInterval: imageInterval,
+                        audioDuration: state.audioDuration
+                    })
+                });
+
+                if (!videoResponse.ok) throw new Error('Video rendering failed');
+                const videoData = await videoResponse.json();
+
+                updateStepStatus('video', 'complete');
+                document.getElementById('overallProgressBar').style.width = '100%';
+                document.getElementById('overallProgress').textContent = '100%';
+                document.getElementById('currentStep').textContent = 'Complete! Opening video...';
+
+                // Open video in new window AND download
+                window.open(videoData.videoUrl, '_blank');
+
+                // Also trigger download
+                const link = document.createElement('a');
+                link.href = videoData.videoUrl;
+                link.download = `${state.videoTitle.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-battletech-horror.mp4`;
+                link.click();
+
+                // Show success
+                setTimeout(() => {
+                    progressSection.classList.add('hidden');
+                    successSection.classList.remove('hidden');
+                }, 1000);
+
+            } catch (error) {
+                showError(`Error: ${error.message}`);
+                generateBtn.disabled = false;
+                ['parse', 'images', 'voiceover', 'video'].forEach(step => {
+                    const stepEl = document.getElementById(`step-${step}`);
+                    if (stepEl && stepEl.textContent.includes('⏳')) {
+                        updateStepStatus(step, 'error');
+                    }
+                });
+            }
+        });
+
+        // Initialize
+        validateForm();
+    </script>
+</body>
+</html>
