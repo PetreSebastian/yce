@@ -330,6 +330,16 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running!' });
 });
 
+// Check which image providers are available (based on API keys)
+app.get('/api/providers-status', (req, res) => {
+  res.json({
+    pollinations: true, // Always available (free, no key needed)
+    gemini: GEMINI_API_KEY && GEMINI_API_KEY.length > 0,
+    fal: FAL_API_KEY && FAL_API_KEY.length > 0,
+    stability: STABILITY_API_KEY && STABILITY_API_KEY.length > 0
+  });
+});
+
 // Extract image prompts from script using Groq AI
 app.post('/api/extract-prompts', async (req, res) => {
   console.log('\n🎯 Prompt extraction request received...');
