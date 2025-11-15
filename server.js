@@ -1578,14 +1578,45 @@ app.post('/api/create-video', async (req, res) => {
         finalVideoPath
       ]);
 
+      let ffmpegError = '';
+      let ffmpegOutput = '';
+
+      // Capture stderr for errors
+      ffmpeg.stderr.on('data', (data) => {
+        const output = data.toString();
+        ffmpegError += output;
+        // Log progress every 10 lines to avoid spam
+        if (ffmpegError.split('\n').length % 10 === 0) {
+          console.log('📊 FFmpeg progress...');
+        }
+      });
+
+      // Capture stdout
+      ffmpeg.stdout.on('data', (data) => {
+        ffmpegOutput += data.toString();
+      });
+
+      // Handle errors
+      ffmpeg.on('error', (err) => {
+        console.error('❌ FFmpeg spawn error:', err.message);
+        reject(new Error(`FFmpeg spawn failed: ${err.message}`));
+      });
+
       ffmpeg.on('close', (code) => {
         if (code === 0) {
           console.log('✅ Audio merged with video + atmospheric effects added');
           resolve();
         } else {
-          reject(new Error(`FFmpeg merge with effects failed with code ${code}`));
+          console.error('❌ FFmpeg stderr:', ffmpegError.slice(-500)); // Last 500 chars
+          reject(new Error(`FFmpeg merge failed with code ${code}. Check logs above.`));
         }
       });
+
+      // Add 10-minute timeout for safety
+      setTimeout(() => {
+        ffmpeg.kill('SIGKILL');
+        reject(new Error('FFmpeg timeout after 10 minutes'));
+      }, 600000);
     });
 
     // Move final video to accessible location
@@ -1991,14 +2022,54 @@ async function processVideoJob(jobId) {
       finalVideoPath
     ]);
 
+    let ffmpegError = '';
+    let ffmpegOutput = '';
+    let progressCounter = 0;
+
+    // Capture stderr for errors AND progress
+    ffmpeg.stderr.on('data', (data) => {
+      const output = data.toString();
+      ffmpegError += output;
+      progressCounter++;
+      // Log progress every 20 lines to show it's working
+      if (progressCounter % 20 === 0) {
+        console.log(`📊 FFmpeg audio merge progress... (${progressCounter} updates)`);
+      }
+    });
+
+    // Capture stdout
+    ffmpeg.stdout.on('data', (data) => {
+      ffmpegOutput += data.toString();
+    });
+
+    // Handle spawn errors
+    ffmpeg.on('error', (err) => {
+      console.error('❌ FFmpeg spawn error:', err.message);
+      console.error('❌ Is ffmpeg in PATH? Try running: ffmpeg -version');
+      reject(new Error(`FFmpeg spawn failed: ${err.message}`));
+    });
+
     ffmpeg.on('close', (code) => {
       if (code === 0) {
         console.log('✅ Audio merged with video + atmospheric effects added');
         resolve();
       } else {
-        reject(new Error(`FFmpeg merge with effects failed with code ${code}`));
+        console.error('❌ FFmpeg merge FAILED!');
+        console.error('❌ Exit code:', code);
+        console.error('❌ Last 1000 chars of stderr:', ffmpegError.slice(-1000));
+        reject(new Error(`FFmpeg merge failed with code ${code}. Check logs above for details.`));
       }
     });
+
+    // Add 15-minute timeout for very long videos
+    const timeout = setTimeout(() => {
+      console.error('⏱️ FFmpeg timeout after 15 minutes - killing process');
+      ffmpeg.kill('SIGKILL');
+      reject(new Error('FFmpeg timeout after 15 minutes'));
+    }, 900000);
+
+    // Clear timeout if process finishes
+    ffmpeg.on('close', () => clearTimeout(timeout));
   });
 
   updateJobStatus(jobId, { progress: 90 });
