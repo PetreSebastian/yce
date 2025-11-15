@@ -445,6 +445,40 @@ Generate exactly ${targetCount} prompts following this format:`;
   }
 });
 
+// Helper function to retry API calls with exponential backoff on rate limits
+async function fetchWithRetry(url, options, maxRetries = 4) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const response = await fetch(url, options);
+
+    if (response.ok) {
+      return response;
+    }
+
+    if (response.status === 429 && attempt < maxRetries) {
+      const errorText = await response.text();
+      console.log(`⚠️ Rate limit hit (attempt ${attempt}/${maxRetries})`);
+
+      // Parse wait time from error message (e.g., "Please try again in 275ms" or "1.31s")
+      let waitTime = 3000 * attempt; // Default exponential backoff: 3s, 6s, 9s, 12s
+      const match = errorText.match(/try again in ([\d.]+)(ms|s)/);
+      if (match) {
+        const value = parseFloat(match[1]);
+        const unit = match[2];
+        waitTime = unit === 's' ? value * 1000 : value;
+        waitTime = Math.ceil(waitTime) + 500; // Add 500ms buffer
+      }
+
+      console.log(`⏱️ Waiting ${waitTime}ms before retry...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      continue;
+    }
+
+    return response;
+  }
+
+  throw new Error('Max retries exceeded');
+}
+
 // Generate script with Groq Llama 3.1 (FREE & FAST!)
 app.post('/api/generate-script', async (req, res) => {
   console.log('\n📝 Script generation request received...');
@@ -488,7 +522,7 @@ Write EXACTLY ${wordsPerSection} words.
 
 ${wordsPerSection} words. Start:`;
 
-    let resp1 = await fetch(GROQ_API_URL, {
+    let resp1 = await fetchWithRetry(GROQ_API_URL, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -524,7 +558,7 @@ ${generatedScript.slice(-1500)}
 
 Add ${wordsPerSection} words. Build tension. Do NOT conclude.`;
 
-      const respN = await fetch(GROQ_API_URL, {
+      const respN = await fetchWithRetry(GROQ_API_URL, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -575,7 +609,7 @@ ${generatedScript.slice(-1500)}
 
 Write ${lastSectionWords} words. Tragic, horrifying EC Comics ending.`;
 
-      const respFinal = await fetch(GROQ_API_URL, {
+      const respFinal = await fetchWithRetry(GROQ_API_URL, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
