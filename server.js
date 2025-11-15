@@ -840,7 +840,11 @@ app.post('/api/generate-voiceover', async (req, res) => {
     // Step 2: Poll task status until completion
     let taskStatus = null;
     let attempts = 0;
-    const maxAttempts = 120; // 2 minutes max (120 * 1 second)
+    // Dynamic timeout: ~1 second per 30 chars + 2 min buffer, max 10 min
+    const estimatedTime = Math.ceil(processedText.length / 30) + 120;
+    const maxAttempts = Math.min(600, estimatedTime); // Up to 10 minutes
+
+    console.log(`⏱️ Text: ${processedText.length} chars, Estimated: ${estimatedTime}s, Timeout: ${maxAttempts}s`);
 
     while (attempts < maxAttempts) {
       await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
@@ -868,13 +872,16 @@ app.post('/api/generate-voiceover', async (req, res) => {
       }
 
       attempts++;
-      if (attempts % 5 === 0) {
-        console.log(`⏳ Still processing... (${attempts}s elapsed)`);
+      if (attempts % 10 === 0) {
+        console.log(`⏳ Still processing... (${attempts}s elapsed, max ${maxAttempts}s)`);
       }
     }
 
     if (!taskStatus || taskStatus.status !== 'completed') {
-      throw new Error('Task timeout - voiceover generation took too long');
+      // Don't throw error immediately - log task ID so user can check manually
+      console.error(`⚠️ TIMEOUT after ${maxAttempts}s, but task may still complete on GenAIPro!`);
+      console.error(`📋 Task ID: ${taskId} - Check status manually at GenAIPro dashboard`);
+      throw new Error(`Task timeout after ${maxAttempts}s. Task ID: ${taskId}. The audio may still be generating - check GenAIPro dashboard.`);
     }
 
     // Step 3: Download the audio file
