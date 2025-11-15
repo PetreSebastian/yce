@@ -1688,9 +1688,10 @@ app.post('/api/create-video', async (req, res) => {
 
       let filter = '';
 
-      // SMOOTH ZOOM IN/OUT with sine wave - NO MOVEMENT, ONLY ZOOM + VISIBLE PARTICLES
+      // SMOOTH ZOOM IN/OUT with sine wave - NO MOVEMENT, ONLY ZOOM + MOVING PARTICLES
       // floor() prevents sub-pixel jitter, sine creates smooth breathing effect
-      filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080:(iw-1920)/2:(ih-1080)/2,zoompan=z='1+0.03*sin(2*PI*on/${totalFrames})':x='floor((iw-iw/zoom)/2)':y='floor((ih-ih/zoom)/2)':d=${totalFrames}:s=1920x1080:fps=${FPS},noise=alls=80:allf=t+u`;
+      // geq creates moving dust particles floating across screen
+      filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080:(iw-1920)/2:(ih-1080)/2,zoompan=z='1+0.03*sin(2*PI*on/${totalFrames})':x='floor((iw-iw/zoom)/2)':y='floor((ih-ih/zoom)/2)':d=${totalFrames}:s=1920x1080:fps=${FPS},geq='lum=lum(X,Y)+if(gt(random((X+N*3)*(Y+N*5)),0.98)*255,80,0)':cb=128:cr=128,noise=alls=40:allf=t+u`;
 
       // Create segment with effect - ULTRAFAST for SPEED!
       await new Promise((resolve, reject) => {
