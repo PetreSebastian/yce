@@ -5,6 +5,7 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { promisify } = require('util');
+const multer = require('multer');
 
 const writeFile = promisify(fs.writeFile);
 const unlink = promisify(fs.unlink);
@@ -23,6 +24,28 @@ const tempDir = path.join(__dirname, 'temp');
 if (!fs.existsSync(tempDir)) {
   fs.mkdirSync(tempDir, { recursive: true });
 }
+
+// Create uploads directory for file uploads
+const uploadsDir = path.join(tempDir, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadsDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 100 * 1024 * 1024 } // 100MB max per file
+});
 
 // Serve static files from temp directory
 app.use('/temp', express.static(tempDir));
@@ -1601,6 +1624,55 @@ app.post('/api/create-video', async (req, res) => {
 });
 
 // ============================================================
+// FILE UPLOAD ENDPOINTS
+// ============================================================
+
+// Upload images (supports multiple files)
+app.post('/api/upload-images', upload.array('images', 50), (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'No images uploaded' });
+    }
+
+    const imagePaths = req.files.map(file => `/temp/uploads/${path.basename(file.path)}`);
+
+    console.log(`✅ Uploaded ${req.files.length} images`);
+
+    res.json({
+      success: true,
+      images: imagePaths,
+      count: req.files.length
+    });
+  } catch (error) {
+    console.error('❌ Image upload error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Upload audio file
+app.post('/api/upload-audio', upload.single('audio'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No audio file uploaded' });
+    }
+
+    const audioPath = `/temp/uploads/${path.basename(req.file.path)}`;
+
+    console.log(`✅ Uploaded audio: ${req.file.originalname} (${req.file.size} bytes)`);
+
+    res.json({
+      success: true,
+      audioPath: audioPath,
+      originalName: req.file.originalname,
+      size: req.file.size
+    });
+  } catch (error) {
+    console.error('❌ Audio upload error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================
 // ASYNC VIDEO GENERATION ENDPOINTS
 // ============================================================
 
@@ -1708,11 +1780,21 @@ async function processVideoJob(jobId) {
 
   updateJobStatus(jobId, { progress: 10 });
 
-  // Save audio file
-  console.log('💾 Saving audio file...');
-  const audioData = audioBase64.replace(/^data:audio\/\w+;base64,/, '');
-  const audioPath = path.join(sessionDir, 'audio.mp3');
-  await writeFile(audioPath, Buffer.from(audioData, 'base64'));
+  // Save audio file (support both file paths and base64)
+  console.log('💾 Preparing audio file...');
+  let audioPath;
+
+  if (audioBase64.startsWith('/temp/')) {
+    // Audio is already uploaded as file - use it directly
+    audioPath = path.join(__dirname, audioBase64);
+    console.log(`✅ Using uploaded audio file: ${audioBase64}`);
+  } else {
+    // Audio is base64 - decode and save
+    const audioData = audioBase64.replace(/^data:audio\/\w+;base64,/, '');
+    audioPath = path.join(sessionDir, 'audio.mp3');
+    await writeFile(audioPath, Buffer.from(audioData, 'base64'));
+    console.log(`✅ Decoded base64 audio to: ${audioPath}`);
+  }
 
   updateJobStatus(jobId, { progress: 15 });
 
@@ -1728,8 +1810,16 @@ async function processVideoJob(jobId) {
     const imagePath = path.join(sessionDir, `image_${i.toString().padStart(4, '0')}.png`);
 
     try {
-      // Check if image is URL or base64
-      if (duplicatedImages[i].startsWith('http://') || duplicatedImages[i].startsWith('https://')) {
+      // Check if image is file path, URL, or base64
+      if (duplicatedImages[i].startsWith('/temp/')) {
+        // Image is already uploaded as file - copy it to session dir
+        const sourcePath = path.join(__dirname, duplicatedImages[i]);
+        const imageBuffer = fs.readFileSync(sourcePath);
+        await writeFile(imagePath, imageBuffer);
+        console.log(`✅ Copied uploaded image ${i+1} from ${duplicatedImages[i]}`);
+
+      } else if (duplicatedImages[i].startsWith('http://') || duplicatedImages[i].startsWith('https://')) {
+        // Download image from URL
         const imageResponse = await fetch(duplicatedImages[i], {
           timeout: 30000,
           headers: {

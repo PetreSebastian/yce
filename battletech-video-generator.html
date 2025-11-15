@@ -1259,6 +1259,61 @@
                 document.getElementById('overallProgress').textContent = '70%';
                 console.log('✅ Step 3 complete - moving to video rendering...');
 
+                // Step 3.5: Upload files to server (MUCH faster than base64!)
+                console.log('📤 Uploading images and audio to server...');
+                document.getElementById('currentStep').textContent = 'Uploading files to server...';
+
+                let imagePaths = [];
+                let audioPath = null;
+
+                // Upload images
+                if (currentMode === 'manual' && uploadedImageFiles.length > 0) {
+                    // Manual mode - upload user's image files
+                    const formData = new FormData();
+
+                    // Convert base64 data URLs to Blobs and add to FormData
+                    for (let i = 0; i < uploadedImageFiles.length; i++) {
+                        const dataUrl = uploadedImageFiles[i].dataUrl;
+                        const response = await fetch(dataUrl);
+                        const blob = await response.blob();
+                        formData.append('images', blob, `image-${i}.png`);
+                    }
+
+                    const uploadResponse = await fetch(`${API_BASE_URL}/api/upload-images`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!uploadResponse.ok) throw new Error('Image upload failed');
+                    const uploadData = await uploadResponse.json();
+                    imagePaths = uploadData.images;
+
+                    console.log(`✅ Uploaded ${imagePaths.length} images`);
+                } else {
+                    // Auto mode - images are already URLs or base64, keep as is
+                    imagePaths = state.generatedImages;
+                }
+
+                // Upload audio if it exists
+                if (state.audioMode === 'upload' && audioFileInput && audioFileInput.files && audioFileInput.files.length > 0) {
+                    const formData = new FormData();
+                    formData.append('audio', audioFileInput.files[0]);
+
+                    const uploadResponse = await fetch(`${API_BASE_URL}/api/upload-audio`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!uploadResponse.ok) throw new Error('Audio upload failed');
+                    const uploadData = await uploadResponse.json();
+                    audioPath = uploadData.audioPath;
+
+                    console.log(`✅ Uploaded audio: ${audioPath}`);
+                } else {
+                    // TTS generated audio - keep as base64
+                    audioPath = state.audioBase64;
+                }
+
                 // Step 4: Render video (ASYNC with polling!)
                 updateStepStatus('video', 'active');
                 document.getElementById('currentStep').textContent = 'Starting video render (this may take 10-30 minutes for long videos)...';
@@ -1267,14 +1322,14 @@
 
                 console.log('🚀 Starting ASYNC video generation...');
 
-                // Start async video generation
+                // Start async video generation with FILE PATHS (much smaller payload!)
                 const startResponse = await fetch(`${API_BASE_URL}/api/create-video-async`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        images: state.generatedImages,
+                        images: imagePaths,
                         effects: state.imageEffects,
-                        audioBase64: state.audioBase64,
+                        audioBase64: audioPath, // Can be either file path or base64
                         imageInterval: imageInterval,
                         audioDuration: state.audioDuration
                     })
