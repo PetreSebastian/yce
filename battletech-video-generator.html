@@ -554,6 +554,50 @@
         const providerGemini = document.getElementById('providerGemini');
         const providerNote = document.getElementById('providerNote');
 
+        // Check which providers are available and enable them
+        async function checkProviderAvailability() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/providers-status`);
+                const status = await response.json();
+
+                console.log('🔍 Provider availability:', status);
+
+                // Enable Pollinations if available
+                if (status.pollinations) {
+                    providerPollinations.disabled = false;
+                    providerPollinations.className = 'bg-pink-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-pink-600 text-xs';
+                    providerPollinations.innerHTML = '🌸 Pollinations (FREE)';
+                }
+
+                // Enable Gemini if available
+                if (status.gemini) {
+                    providerGemini.disabled = false;
+                    providerGemini.className = 'bg-blue-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-blue-600 text-xs';
+                    providerGemini.innerHTML = '⭐ Gemini ($15 FREE)';
+                }
+
+                // Enable Fal.ai if available (default selected)
+                if (status.fal) {
+                    providerFal.disabled = false;
+                    providerFal.className = 'bg-orange-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-orange-600 text-xs';
+                }
+
+                // Enable Stability if available
+                if (status.stability) {
+                    providerStability.disabled = false;
+                    providerStability.className = 'bg-purple-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-purple-600 text-xs';
+                    providerStability.innerHTML = '💜 Stability';
+                }
+
+                console.log('✅ Provider buttons enabled based on API key availability');
+            } catch (error) {
+                console.error('❌ Failed to check provider availability:', error);
+            }
+        }
+
+        // Check provider availability on page load
+        checkProviderAvailability();
+
         // Manual image upload elements
         const useAutoGeneration = document.getElementById('useAutoGeneration');
         const useManualUpload = document.getElementById('useManualUpload');
