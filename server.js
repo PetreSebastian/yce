@@ -541,6 +541,10 @@ Add ${wordsPerSection} words. Build tension. Do NOT conclude.`;
         generatedScript += '\n\n' + cont;
         totalWords = generatedScript.split(/\s+/).length;
         console.log(`✅ Section ${i}: +${cont.split(/\s+/).length} words (Total: ${totalWords})`);
+      } else {
+        const errorText = await respN.text();
+        console.error(`❌ Section ${i} FAILED: ${respN.status} - ${errorText}`);
+        throw new Error(`Section ${i} generation failed: ${respN.status}`);
       }
     }
 
@@ -578,6 +582,10 @@ Write ${lastSectionWords} words. Tragic, horrifying EC Comics ending.`;
         generatedScript += '\n\n' + conclusion;
         totalWords = generatedScript.split(/\s+/).length;
         console.log(`✅ Final: +${conclusion.split(/\s+/).length} words (Total: ${totalWords})`);
+      } else {
+        const errorText = await respFinal.text();
+        console.error(`❌ Final section FAILED: ${respFinal.status} - ${errorText}`);
+        throw new Error(`Final section generation failed: ${respFinal.status}`);
       }
     }
 
@@ -603,8 +611,6 @@ Write ${lastSectionWords} words. Tragic, horrifying EC Comics ending.`;
     } else {
       console.log(`✅ Word count within acceptable range!`);
     }
-
-    console.log(`🚀 Generated in ${groqData.usage?.total_time || 'unknown'} time`);
 
     res.json({
       success: true,
