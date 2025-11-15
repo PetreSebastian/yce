@@ -535,7 +535,7 @@ TAGS:
 });
 
 // Helper function to retry API calls with exponential backoff on rate limits
-async function fetchWithRetry(url, options, maxRetries = 4) {
+async function fetchWithRetry(url, options, maxRetries = 999) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     const response = await fetch(url, options);
 
@@ -543,21 +543,41 @@ async function fetchWithRetry(url, options, maxRetries = 4) {
       return response;
     }
 
-    if (response.status === 429 && attempt < maxRetries) {
+    if (response.status === 429) {
       const errorText = await response.text();
-      console.log(`⚠️ Rate limit hit (attempt ${attempt}/${maxRetries})`);
+      console.log(`⚠️ Rate limit hit (attempt ${attempt})`);
 
-      // Parse wait time from error message (e.g., "Please try again in 275ms" or "1.31s")
-      let waitTime = 3000 * attempt; // Default exponential backoff: 3s, 6s, 9s, 12s
-      const match = errorText.match(/try again in ([\d.]+)(ms|s)/);
-      if (match) {
-        const value = parseFloat(match[1]);
-        const unit = match[2];
-        waitTime = unit === 's' ? value * 1000 : value;
-        waitTime = Math.ceil(waitTime) + 500; // Add 500ms buffer
+      // Parse wait time from error message
+      // Formats: "275ms", "1.31s", "45m6.048s", "1h30m", etc.
+      let waitTime = 3000 * attempt; // Default exponential backoff
+
+      // Try to parse complex time format (45m6.048s)
+      const complexMatch = errorText.match(/try again in ([\d.]+)m([\d.]+)s/);
+      if (complexMatch) {
+        const minutes = parseFloat(complexMatch[1]);
+        const seconds = parseFloat(complexMatch[2]);
+        waitTime = (minutes * 60 + seconds) * 1000 + 1000; // Add 1s buffer
+        console.log(`⏳ DAILY RATE LIMIT - Waiting ${minutes}m ${seconds}s (${Math.ceil(waitTime / 1000)}s total)...`);
+      } else {
+        // Try simple format (1.31s or 275ms)
+        const simpleMatch = errorText.match(/try again in ([\d.]+)(ms|s|m|h)/);
+        if (simpleMatch) {
+          const value = parseFloat(simpleMatch[1]);
+          const unit = simpleMatch[2];
+
+          if (unit === 'h') waitTime = value * 3600 * 1000;
+          else if (unit === 'm') waitTime = value * 60 * 1000;
+          else if (unit === 's') waitTime = value * 1000;
+          else if (unit === 'ms') waitTime = value;
+
+          waitTime = Math.ceil(waitTime) + 1000; // Add 1s buffer
+          console.log(`⏱️ Waiting ${Math.ceil(waitTime / 1000)}s before retry...`);
+        } else {
+          console.log(`⏱️ Using default backoff: ${waitTime}ms...`);
+        }
       }
 
-      console.log(`⏱️ Waiting ${waitTime}ms before retry...`);
+      // Wait and retry (NEVER GIVE UP!)
       await new Promise(resolve => setTimeout(resolve, waitTime));
       continue;
     }
