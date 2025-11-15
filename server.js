@@ -2117,6 +2117,98 @@ async function processVideoJob(jobId) {
   console.log(`🎉 Job ${jobId} complete!\n`);
 }
 
+// ============================================================
+// DESCRIPTION + TAGS GENERATOR
+// ============================================================
+app.post('/api/generate-description-tags', async (req, res) => {
+  console.log('\n📝 Description + Tags generation request received...');
+
+  try {
+    const { title, script } = req.body;
+
+    if (!title) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+
+    // Create prompt for Groq
+    const prompt = `You are a YouTube video SEO expert. Based on this BattleTech horror video, generate:
+
+1. A compelling video description (2-3 paragraphs, 150-200 words)
+2. 15-20 relevant tags for YouTube SEO
+
+Video Title: ${title}
+
+${script ? `Video Script (first 1000 chars):\n${script.substring(0, 1000)}...` : 'No script provided - use title only.'}
+
+Format your response EXACTLY like this:
+
+DESCRIPTION:
+[Your description here - make it engaging, mention BattleTech universe, horror elements, and encourage viewers to like/subscribe]
+
+TAGS:
+tag1, tag2, tag3, tag4, tag5, tag6, tag7, tag8, tag9, tag10, tag11, tag12, tag13, tag14, tag15`;
+
+    console.log('🤖 Calling Groq API for description + tags...');
+
+    const response = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'mixtral-8x7b-32768',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a YouTube SEO expert specializing in BattleTech and horror content. Generate compelling descriptions and relevant tags.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Groq API failed: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    const generatedText = data.choices[0].message.content;
+
+    console.log('✅ Generated description + tags from Groq');
+
+    // Parse the response
+    const descriptionMatch = generatedText.match(/DESCRIPTION:\s*([\s\S]*?)\s*TAGS:/i);
+    const tagsMatch = generatedText.match(/TAGS:\s*([\s\S]*?)$/i);
+
+    const description = descriptionMatch ? descriptionMatch[1].trim() : generatedText;
+    const tagsString = tagsMatch ? tagsMatch[1].trim() : '';
+    const tags = tagsString.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
+
+    console.log(`📊 Generated: ${description.length} chars description, ${tags.length} tags`);
+
+    res.json({
+      success: true,
+      description: description,
+      tags: tags,
+      tagsString: tags.join(', ')
+    });
+
+  } catch (error) {
+    console.error('❌ Description + Tags generation error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 app.listen(PORT, () => {
   console.log('='.repeat(60));
   console.log('🚀 VIDEO GENERATOR SERVER PORNIT!');
