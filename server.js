@@ -550,6 +550,7 @@ async function fetchWithRetry(url, options, maxRetries = 999) {
       // Parse wait time from error message
       // Formats: "275ms", "1.31s", "45m6.048s", "1h30m", etc.
       let waitTime = 3000 * attempt; // Default exponential backoff
+      const MAX_WAIT_TIME = 60000; // Maximum 60 seconds wait
 
       // Try to parse complex time format (45m6.048s)
       const complexMatch = errorText.match(/try again in ([\d.]+)m([\d.]+)s/);
@@ -557,7 +558,12 @@ async function fetchWithRetry(url, options, maxRetries = 999) {
         const minutes = parseFloat(complexMatch[1]);
         const seconds = parseFloat(complexMatch[2]);
         waitTime = (minutes * 60 + seconds) * 1000 + 1000; // Add 1s buffer
-        console.log(`⏳ DAILY RATE LIMIT - Waiting ${minutes}m ${seconds}s (${Math.ceil(waitTime / 1000)}s total)...`);
+
+        if (waitTime > MAX_WAIT_TIME) {
+          console.error(`❌ DAILY RATE LIMIT HIT - API wants us to wait ${minutes}m ${seconds}s (too long!)`);
+          throw new Error(`Groq daily rate limit exceeded. API says wait ${minutes}m ${seconds}s. Try again later or use a different API key.`);
+        }
+        console.log(`⏳ Rate limit - Waiting ${minutes}m ${seconds}s (${Math.ceil(waitTime / 1000)}s total)...`);
       } else {
         // Try simple format (1.31s or 275ms)
         const simpleMatch = errorText.match(/try again in ([\d.]+)(ms|s|m|h)/);
@@ -571,13 +577,18 @@ async function fetchWithRetry(url, options, maxRetries = 999) {
           else if (unit === 'ms') waitTime = value;
 
           waitTime = Math.ceil(waitTime) + 1000; // Add 1s buffer
+
+          if (waitTime > MAX_WAIT_TIME) {
+            console.error(`❌ DAILY RATE LIMIT HIT - API wants us to wait ${value}${unit} (too long!)`);
+            throw new Error(`Groq daily rate limit exceeded. API says wait ${value}${unit}. Try again later or use a different API key.`);
+          }
           console.log(`⏱️ Waiting ${Math.ceil(waitTime / 1000)}s before retry...`);
         } else {
           console.log(`⏱️ Using default backoff: ${waitTime}ms...`);
         }
       }
 
-      // Wait and retry (NEVER GIVE UP!)
+      // Wait and retry (but not if daily limit hit!)
       await new Promise(resolve => setTimeout(resolve, waitTime));
       continue;
     }
