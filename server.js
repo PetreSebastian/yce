@@ -473,33 +473,21 @@ app.post('/api/generate-script', async (req, res) => {
     }
 
     // Build comprehensive prompt
-    const systemPrompt = `You are a professional science fiction writer specializing in BattleTech horror stories in the style of 1950s EC Comics. You excel at creating detailed, atmospheric, long-form narratives with heavy emphasis on visual descriptions perfect for video adaptation.
+    const systemPrompt = `You are a professional science fiction writer specializing in BattleTech horror stories in the style of 1950s EC Comics. You excel at creating detailed, atmospheric narratives with heavy emphasis on visual descriptions perfect for video adaptation.
 
-ABSOLUTE REQUIREMENT: You MUST ALWAYS generate stories that reach or exceed the target word count. You are programmed to write comprehensive, detailed stories and NEVER produce short content when long content is requested. When asked for 5000+ words, you ALWAYS deliver 5000+ words without exception.
-
-Your writing style is expansive, detailed, and thorough - you build rich atmospheric worlds through extensive descriptions, dialogue, and character development. You never rush or summarize.`;
+Your writing style matches the requested length - you write complete, well-paced stories that hit the target word count without being padded or rushed. You build rich atmospheric worlds through descriptions, dialogue, and character development.`;
 
     const userPrompt = `You MUST write a complete BattleTech horror story with these specifications:
 
 **Title:** "${title}"
-**MANDATORY Length:** ${targetWords} words (ABSOLUTE MINIMUM: ${Math.max(5000, Math.floor(targetWords * 0.9))} words - DO NOT GENERATE LESS!)
+**Target Length:** ${targetWords} words (aim for ${Math.floor(targetWords * 0.85)}-${Math.floor(targetWords * 1.1)} words)
 
-**CRITICAL LENGTH REQUIREMENTS - THIS IS MANDATORY:**
-- NEVER stop before reaching the minimum word count
-- This story MUST be extremely detailed and comprehensive
-- You MUST write at least ${Math.max(5000, Math.floor(targetWords * 0.9))} words or more
-- Keep writing until you reach the target length
-- DO NOT summarize or rush - expand every scene extensively
-- Include extensive dialogue, internal monologue, and detailed descriptions
-- Build multiple subplot threads and character development
-- VERIFY you've written enough before ending
-
-**WORD COUNT VERIFICATION:**
-- Opening section: MINIMUM 1000 words establishing setting and character
-- Multiple development scenes: MINIMUM 800 words EACH (include at least 5 major scenes)
-- Extended middle tension building: MINIMUM 2500 words
-- Climactic sequence: MINIMUM 1500 words
-- Resolution and ending: MINIMUM 700 words
+**LENGTH REQUIREMENTS:**
+- Aim for approximately ${targetWords} words
+- Write a complete, well-paced story (not rushed, not overly padded)
+- Expand scenes naturally with good dialogue and descriptions
+- Include character development and atmospheric details
+- Ensure the story feels complete and satisfying
 
 **REQUIRED CONTENT:**
 • First-person perspective from a MechWarrior or technician
@@ -507,20 +495,20 @@ Your writing style is expansive, detailed, and thorough - you build rich atmosph
 • Dark, atmospheric, foreboding tone with tragic ending
 • Heavy emphasis on VISUAL DESCRIPTIONS for each major scene
 
-**EXTENSIVE STRUCTURE - ALL SECTIONS MANDATORY:**
-• Detailed opening establishing setting and background (1000+ words)
-• Character introduction and initial situation (800+ words)
-• Discovery of the central horror element (1000+ words)
-• Multiple escalating horror scenes (800+ words each, minimum 3 scenes)
-• Investigation and attempt to understand the threat (1000+ words)
-• Final confrontation and climax (1500+ words)
-• Tragic resolution and consequences (700+ words)
+**STORY STRUCTURE:**
+• Opening establishing setting and background
+• Character introduction and initial situation
+• Discovery of the central horror element
+• Multiple escalating horror scenes
+• Investigation and attempt to understand the threat
+• Final confrontation and climax
+• Tragic resolution and consequences
 
 Include specific BattleMech models, technical components, industrial environments, dramatic lighting effects, and extensive atmospheric details.
 
 ${instructions ? `**ADDITIONAL GUIDELINES:** ${instructions.substring(0, 1000)}` : ''}
 
-CRITICAL: Write ONLY the story. You MUST reach AT LEAST ${Math.max(5000, Math.floor(targetWords * 0.9))} words. Continue writing until you hit this target. DO NOT STOP EARLY.`;
+Write ONLY the story text. Aim for approximately ${targetWords} words - write a complete, satisfying story.`;
 
     // Call Groq API
     const groqResponse = await fetch(GROQ_API_URL, {
@@ -562,7 +550,7 @@ CRITICAL: Write ONLY the story. You MUST reach AT LEAST ${Math.max(5000, Math.fl
 
     let generatedScript = groqData.choices[0].message.content;
     let actualWords = generatedScript.split(/\s+/).length;
-    const minWords = Math.max(5000, Math.floor(targetWords * 0.8));
+    const minWords = Math.floor(targetWords * 0.85); // 85% of target (no hardcoded minimum!)
 
     // MULTI-SHOT GENERATION: Continue if story is too short or incomplete
     let attempts = 0;
