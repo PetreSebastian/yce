@@ -461,12 +461,13 @@ app.post('/api/generate-script', async (req, res) => {
     console.log('🚀 Using Groq Llama 3.1 70B (free & fast!)...');
     console.log(`📝 Strategy: Multi-section generation to reach EXACTLY ${targetWords} words`);
 
-    // MULTI-SECTION GENERATION: Break X (targetWords) into sections
-    const wordsPerSection = 1200; // Each section = ~1200 words
-    const numSections = Math.ceil(targetWords / wordsPerSection);
+    // MULTI-SECTION GENERATION: Distribute X evenly across sections
+    const idealSectionSize = 1000; // Aim for ~1000 word sections
+    const numSections = Math.ceil(targetWords / idealSectionSize);
+    const wordsPerSection = Math.floor(targetWords / numSections); // Evenly distributed
     const lastSectionWords = targetWords - (wordsPerSection * (numSections - 1));
 
-    console.log(`📚 Generating ${numSections} sections (${wordsPerSection} words each, final: ${lastSectionWords} words)`);
+    console.log(`📚 Generating ${numSections} sections (~${wordsPerSection} words each, final: ${lastSectionWords} words)`);
 
     const systemPrompt = `You are a BattleTech horror writer. Write in 1950s EC Comics style. You write the EXACT word count requested.`;
 
