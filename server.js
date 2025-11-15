@@ -472,43 +472,21 @@ app.post('/api/generate-script', async (req, res) => {
       console.log('⚠️ Could not load INSTRUCTIONS.txt, using default guidelines');
     }
 
-    // Build comprehensive prompt
-    const systemPrompt = `You are a professional science fiction writer specializing in BattleTech horror stories in the style of 1950s EC Comics. You excel at creating detailed, atmospheric narratives with heavy emphasis on visual descriptions perfect for video adaptation.
+    // Build SIMPLE, DIRECT prompt
+    const systemPrompt = `You are a professional BattleTech horror writer. You ALWAYS write stories that match the EXACT word count requested. You count words as you write and stop precisely at the target.`;
 
-Your writing style matches the requested length - you write complete, well-paced stories that hit the target word count without being padded or rushed. You build rich atmospheric worlds through descriptions, dialogue, and character development.`;
+    const userPrompt = `WORD COUNT: ${targetWords} words (MUST be between ${targetWords - 500} and ${targetWords + 500} words)
 
-    const userPrompt = `Write a complete BattleTech horror story with these specifications:
+Write a BattleTech horror story titled "${title}" in 1950s EC Comics style (Tales from the Crypt).
 
-**Title:** "${title}"
-**Target Length:** EXACTLY ${targetWords} words (acceptable range: ${targetWords - 500} to ${targetWords + 500} words)
+Requirements:
+- EXACTLY ${targetWords} words (count as you write, stop at this number)
+- First-person perspective (MechWarrior or technician)
+- Dark, atmospheric horror with tragic ending
+- Visual descriptions for video adaptation
+- Include BattleMech models and technical details
 
-**CRITICAL LENGTH REQUIREMENT:**
-- You MUST write between ${targetWords - 500} and ${targetWords + 500} words
-- Aim for exactly ${targetWords} words - this is very important
-- Write a complete, well-paced story that hits this word count
-- Expand or condense scenes as needed to hit the target
-- Do NOT stop early, do NOT write excessively long
-
-**REQUIRED CONTENT:**
-• First-person perspective from a MechWarrior or technician
-• 1950s EC Comics horror aesthetic (Tales from the Crypt style)
-• Dark, atmospheric, foreboding tone with tragic ending
-• Heavy emphasis on VISUAL DESCRIPTIONS for each major scene
-
-**STORY STRUCTURE:**
-• Opening establishing setting and background
-• Character introduction and initial situation
-• Discovery of the central horror element
-• Multiple escalating horror scenes
-• Investigation and attempt to understand the threat
-• Final confrontation and climax
-• Tragic resolution and consequences
-
-Include specific BattleMech models, technical components, industrial environments, dramatic lighting effects, and extensive atmospheric details.
-
-${instructions ? `**ADDITIONAL GUIDELINES:** ${instructions.substring(0, 1000)}` : ''}
-
-Write ONLY the story text. Target: ${targetWords} words (±500). Make it complete and satisfying. Hit the word count target.`;
+Write ONLY the story. ${targetWords} words. Start writing now:`;
 
     // Call Groq API
     const groqResponse = await fetch(GROQ_API_URL, {
@@ -529,9 +507,9 @@ Write ONLY the story text. Target: ${targetWords} words (±500). Make it complet
             content: userPrompt
           }
         ],
-        temperature: 0.8,
-        max_tokens: Math.floor(targetWords * 1.6), // Conservative: ~1.3-1.5 tokens per word
-        top_p: 0.9,
+        temperature: 0.7, // Lower temp for more predictable length
+        max_tokens: Math.floor((targetWords + 500) * 1.5), // Upper bound + buffer
+        top_p: 0.95,
         stream: false
       })
     });
@@ -565,15 +543,11 @@ Write ONLY the story text. Target: ${targetWords} words (±500). Make it complet
       console.log(`⚠️ Model stopped early (only ${actualWords}/${minWords} words) - will force continuation...`);
     }
 
-    // MULTI-SHOT GENERATION: Continue if story is too short
-    let attempts = 0;
-    const maxAttempts = 3; // Increased to ensure we hit target
-
-    while (actualWords < minWords && attempts < maxAttempts) {
+    // SIMPLE CONTINUATION: Only if WAY too short (> 1000 words short)
+    if (actualWords < minWords - 1000) {
       const wordsNeeded = minWords - actualWords;
-      console.log(`📝 Story too short (${actualWords} words, need ${minWords}). Adding ~${wordsNeeded} more words... (attempt ${attempts + 1}/${maxAttempts})`);
+      console.log(`⚠️ Story WAY too short (${actualWords} words, need ${minWords}). Adding ${wordsNeeded} words...`);
 
-      // Continue the story using FULL conversation history for better context
       const continueResponse = await fetch(GROQ_API_URL, {
         method: 'POST',
         headers: {
@@ -583,52 +557,26 @@ Write ONLY the story text. Target: ${targetWords} words (±500). Make it complet
         body: JSON.stringify({
           model: 'llama-3.3-70b-versatile',
           messages: [
-            {
-              role: 'system',
-              content: systemPrompt // Reuse original system prompt for consistency
-            },
-            {
-              role: 'user',
-              content: userPrompt // Reuse original instructions
-            },
-            {
-              role: 'assistant',
-              content: generatedScript // Show what was already written (full context!)
-            },
-            {
-              role: 'user',
-              content: `This story is currently ${actualWords} words, but needs to be ${minWords}-${maxWords} words. Continue the story with approximately ${wordsNeeded} more words. DO NOT summarize or conclude hastily - keep building the narrative with more scenes, atmospheric details, and character development. The story should feel complete only when it reaches the target length.`
-            }
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+            { role: 'assistant', content: generatedScript },
+            { role: 'user', content: `Continue with ${wordsNeeded} more words to reach ${minWords} words total.` }
           ],
-          temperature: 0.8,
-          max_tokens: Math.floor(wordsNeeded * 3.0), // Increased from 1.8 to 3.0 for safety
-          top_p: 0.9,
+          temperature: 0.7,
+          max_tokens: Math.floor(wordsNeeded * 1.5),
+          top_p: 0.95,
           stream: false
         })
       });
 
       if (continueResponse.ok) {
         const continueData = await continueResponse.json();
-        if (continueData.choices && continueData.choices.length > 0) {
-          const continuation = continueData.choices[0].message.content;
-          const continueFinishReason = continueData.choices[0].finish_reason;
-          const continueTokens = continueData.usage?.completion_tokens || 0;
-          const continuationWords = continuation.split(/\s+/).length;
-
-          generatedScript += '\n\n' + continuation; // Add spacing between sections
+        if (continueData.choices?.[0]?.message?.content) {
+          generatedScript += '\n\n' + continueData.choices[0].message.content;
           actualWords = generatedScript.split(/\s+/).length;
-
-          console.log(`✅ Added ${continuationWords} words (finish: ${continueFinishReason}, tokens: ${continueTokens})`);
-          console.log(`📝 Total now: ${actualWords} words`);
-        } else {
-          console.error('⚠️ Continuation returned no content!');
+          console.log(`✅ Continued to ${actualWords} words`);
         }
-      } else {
-        const errorText = await continueResponse.text();
-        console.error(`❌ Continuation API call failed: ${continueResponse.status} - ${errorText}`);
       }
-
-      attempts++;
     }
 
     // Ensure script isn't too large for frontend processing
