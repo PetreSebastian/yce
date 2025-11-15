@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: battletech-video-generator
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GENAIPRO_JWT
+        sync: false
+      - key: FAL_API_KEY
+        sync: false
+      - key: STABILITY_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false

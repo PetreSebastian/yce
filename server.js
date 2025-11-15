@@ -11,7 +11,7 @@ const unlink = promisify(fs.unlink);
 const mkdir = promisify(fs.mkdir);
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Enable CORS for all origins
 app.use(cors());
