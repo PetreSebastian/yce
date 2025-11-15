@@ -1547,6 +1547,11 @@ app.post('/api/create-video', async (req, res) => {
     }
 
     console.log(`📊 Processing ${images.length} images with ${imageInterval}s interval`);
+    console.log(`🎵 AUDIO DURATION RECEIVED: ${audioDuration} seconds (${(audioDuration / 60).toFixed(1)} minutes)`);
+
+    if (!audioDuration || audioDuration <= 0) {
+      throw new Error(`Invalid audio duration: ${audioDuration}. Cannot create video.`);
+    }
 
     // DUPLICATE IMAGES x2 but KEEP SAME TOTAL VIDEO DURATION
     const originalCount = images.length;
@@ -1558,7 +1563,7 @@ app.post('/api/create-video', async (req, res) => {
     console.log(`🔄 Image distribution:`);
     console.log(`   Original: ${originalCount} images`);
     console.log(`   Duplicated: ${duplicatedImages.length} images`);
-    console.log(`   Audio duration: ${audioDuration}s`);
+    console.log(`   Audio duration: ${audioDuration}s (${(audioDuration / 60).toFixed(1)} min)`);
     console.log(`   Interval per image: ${adjustedInterval.toFixed(1)}s (was ${imageInterval}s)`);
     console.log(`   Total video duration: ${adjustedInterval * duplicatedImages.length}s = ${audioDuration}s ✅`);
 
@@ -1595,11 +1600,11 @@ app.post('/api/create-video', async (req, res) => {
 
       try {
         // Check if image is URL or base64
-        if (images[i].startsWith('http://') || images[i].startsWith('https://')) {
+        if (duplicatedImages[i].startsWith('http://') || duplicatedImages[i].startsWith('https://')) {
           // Download image from URL
-          console.log(`📥 Downloading image ${i+1}/${images.length} from URL...`);
+          console.log(`📥 Downloading image ${i+1}/${duplicatedImages.length} from URL...`);
 
-          const imageResponse = await fetch(images[i], {
+          const imageResponse = await fetch(duplicatedImages[i], {
             timeout: 30000,
             headers: {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
@@ -1621,9 +1626,9 @@ app.post('/api/create-video', async (req, res) => {
 
           await writeFile(imagePath, imageBuffer);
           console.log(`✅ Image ${i+1} downloaded: ${imageBuffer.length} bytes`);
-        } else if (images[i].startsWith('data:image')) {
+        } else if (duplicatedImages[i].startsWith('data:image')) {
           // Assume base64 format
-          const imageData = images[i].replace(/^data:image\/\w+;base64,/, '');
+          const imageData = duplicatedImages[i].replace(/^data:image\/\w+;base64,/, '');
           await writeFile(imagePath, Buffer.from(imageData, 'base64'));
           console.log(`✅ Image ${i+1} saved from base64`);
         } else {
@@ -1664,12 +1669,12 @@ app.post('/api/create-video', async (req, res) => {
       let filter = '';
 
       if (effect === 'zoomIn') {
-        // ZOOM IN first half, ZOOM OUT second half - PERFECTLY CENTERED, ZERO MOVEMENT!
-        // crop=(out_w):(out_h):(x):(y) where x=(in_w-out_w)/2 centers horizontally
-        filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080:(iw-1920)/2:(ih-1080)/2,zoompan=z='if(lte(on,${midFrame}),1.0+0.03*on/${midFrame},1.03-0.03*(on-${midFrame})/${midFrame})':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${totalFrames}:s=1920x1080:fps=${FPS},noise=alls=5:allf=t+u:c0s=15:c0f=a+t`;
+        // ZOOM IN first half, ZOOM OUT second half - ROCK SOLID CENTER, NO MOVEMENT!
+        // First scale/crop to exact size, THEN apply zoom centered at 960,540 (center of 1920x1080)
+        filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080:(iw-1920)/2:(ih-1080)/2,zoompan=z='if(lte(on,${midFrame}),1.0+0.03*on/${midFrame},1.03-0.03*(on-${midFrame})/${midFrame})':x=960:y=540:d=${totalFrames}:s=1920x1080:fps=${FPS},noise=alls=30:allf=t+u`;
       } else {
-        // ZOOM OUT first half, ZOOM IN second half - PERFECTLY CENTERED, ZERO MOVEMENT!
-        filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080:(iw-1920)/2:(ih-1080)/2,zoompan=z='if(lte(on,${midFrame}),1.03-0.03*on/${midFrame},1.0+0.03*(on-${midFrame})/${midFrame})':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${totalFrames}:s=1920x1080:fps=${FPS},noise=alls=5:allf=t+u:c0s=15:c0f=a+t`;
+        // ZOOM OUT first half, ZOOM IN second half - ROCK SOLID CENTER, NO MOVEMENT!
+        filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080:(iw-1920)/2:(ih-1080)/2,zoompan=z='if(lte(on,${midFrame}),1.03-0.03*on/${midFrame},1.0+0.03*(on-${midFrame})/${midFrame})':x=960:y=540:d=${totalFrames}:s=1920x1080:fps=${FPS},noise=alls=30:allf=t+u`;
       }
 
       // Create segment with effect - ULTRAFAST for SPEED!
@@ -1745,7 +1750,7 @@ app.post('/api/create-video', async (req, res) => {
         '-i', videoOnlyPath,
         '-i', audioPath,
         '-filter_complex',
-        `[0:v]noise=alls=10:allf=t+u,eq=brightness=0.02:contrast=1.05:saturation=0.95[vout]`,
+        `[0:v]noise=alls=40:allf=t+u,eq=brightness=0.02:contrast=1.08:saturation=0.90[vout]`,
         '-map', '[vout]',
         '-map', '1:a',
         '-c:v', 'libx264',
