@@ -372,11 +372,11 @@ REQUIREMENTS:
 - Focus on dramatic, atmospheric, and visually striking scenes
 - Include BattleMech models, environments, lighting details
 - Use "1950s EC Comics horror style" for each prompt
-- CRITICAL: NO text, NO numbers, NO letters, NO signs, NO readable text visible in the scene
+- CRITICAL: NO text, NO numbers, NO letters, NO signs, NO speech bubbles, NO dialogue, NO borders, NO frames, NO black bars
 - Number each prompt (1., 2., 3., etc.)
 
 FORMAT EXAMPLE:
-1. 1950s EC Comics horror style: Atlas BattleMech stands in dimly lit maintenance bay, orange auxiliary lights casting dramatic shadows across damaged armor, no text or numbers visible.
+1. 1950s EC Comics horror style: Atlas BattleMech stands in dimly lit maintenance bay, orange auxiliary lights casting dramatic shadows across damaged armor, no text, no speech bubbles, no borders.
 
 Generate exactly ${targetCount} prompts following this format:`;
 
@@ -904,23 +904,15 @@ app.post('/api/generate-voiceover', async (req, res) => {
       }
     }
 
-    // Step 3: Download the audio file
+    // Step 3: Return audio URL directly (browser will load it faster than base64)
     const audioUrl = taskStatus.result;
-    console.log(`📥 Downloading audio from: ${audioUrl}`);
-
-    const audioResponse = await fetch(audioUrl);
-    if (!audioResponse.ok) {
-      throw new Error('Failed to download audio file');
-    }
-
-    const audioBuffer = await audioResponse.buffer();
-    const audioBase64 = audioBuffer.toString('base64');
-
-    console.log('✅ Voiceover downloaded and encoded!');
+    console.log(`✅ Audio ready at: ${audioUrl}`);
+    console.log('📤 Returning audio URL to browser (MUCH faster than base64 encoding!)');
 
     res.json({
       success: true,
-      audioBase64: `data:audio/mpeg;base64,${audioBase64}`,
+      audioUrl: audioUrl, // Send URL instead of base64
+      audioBase64: null, // Legacy field, will be loaded by frontend
       duration: 0, // Will be calculated by frontend
       taskId: taskId,
       truncated: text.length > processedText.length,
@@ -956,8 +948,8 @@ app.post('/api/generate/gemini', async (req, res) => {
       console.log(`Generating image ${i + 1}/${prompts.length}...`);
 
       try {
-        // Add "no text, no numbers" to prompt
-        const enhancedPrompt = `${prompts[i]}, no text, no numbers, no letters, no signs`;
+        // Add comprehensive "no text, no borders" exclusions
+        const enhancedPrompt = `${prompts[i]}, NO text, NO numbers, NO letters, NO signs, NO speech bubbles, NO dialogue, NO borders, NO frames, NO black bars, NO white borders, NO colored borders`;
 
         const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
           method: 'POST',
@@ -1205,8 +1197,8 @@ app.post('/api/generate/fal', async (req, res) => {
       console.log(`🎨 Generating image ${i + 1}/${prompts.length}...`);
 
       try {
-        // Add "no text, no numbers" to prompt
-        const enhancedPrompt = `${prompts[i]}, no text, no numbers, no letters, no signs`;
+        // Add comprehensive "no text, no borders" exclusions
+        const enhancedPrompt = `${prompts[i]}, NO text, NO numbers, NO letters, NO signs, NO speech bubbles, NO dialogue, NO borders, NO frames, NO black bars, NO white borders, NO colored borders`;
 
         const response = await fetch(FAL_API_URL, {
           method: 'POST',
@@ -1309,8 +1301,8 @@ app.post('/api/generate/pollinations', async (req, res) => {
     async function generateImageWithRetry(prompt, index, maxRetries = 5) {
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-          // Add "no text, no numbers" to prompt
-          const enhancedPrompt = `${prompt}, no text, no numbers, no letters, no signs`;
+          // Add comprehensive "no text, no borders" exclusions
+          const enhancedPrompt = `${prompt}, NO text, NO numbers, NO letters, NO signs, NO speech bubbles, NO dialogue, NO borders, NO frames, NO black bars, NO white borders, NO colored borders`;
           const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=1024&height=1024&nologo=true&enhance=true&seed=${Date.now() + index + attempt}`;
 
           // Quick HEAD check to verify URL works
@@ -1690,8 +1682,8 @@ app.post('/api/create-video', async (req, res) => {
 
       // SMOOTH ZOOM IN/OUT with sine wave - NO MOVEMENT, ONLY ZOOM + MOVING PARTICLES
       // floor() prevents sub-pixel jitter, sine creates smooth breathing effect
-      // geq creates moving dust particles floating across screen
-      filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080:(iw-1920)/2:(ih-1080)/2,zoompan=z='1+0.03*sin(2*PI*on/${totalFrames})':x='floor((iw-iw/zoom)/2)':y='floor((ih-ih/zoom)/2)':d=${totalFrames}:s=1920x1080:fps=${FPS},geq='lum=lum(X,Y)+if(gt(random((X+N*3)*(Y+N*5)),0.98)*255,80,0)':cb=128:cr=128,noise=alls=40:allf=t+u`;
+      // geq creates moving dust particles floating across screen (5% of pixels at brightness 150)
+      filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080:(iw-1920)/2:(ih-1080)/2,zoompan=z='1+0.03*sin(2*PI*on/${totalFrames})':x='floor((iw-iw/zoom)/2)':y='floor((ih-ih/zoom)/2)':d=${totalFrames}:s=1920x1080:fps=${FPS},geq='lum=lum(X,Y)+if(gt(random((X+N*3)*(Y+N*5)),0.95)*255,150,0)':cb=128:cr=128,noise=alls=60:allf=t+u`;
 
       // Create segment with effect - ULTRAFAST for SPEED!
       await new Promise((resolve, reject) => {

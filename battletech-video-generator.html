@@ -1440,11 +1440,32 @@
                         if (!voiceoverResponse.ok) throw new Error('Voiceover generation failed');
                         const voiceoverData = await voiceoverResponse.json();
 
-                        state.audioBase64 = voiceoverData.audioBase64;
+                        // Handle both URL (new, faster) and base64 (old) formats
+                        let audioSrc = voiceoverData.audioBase64;
+
+                        if (voiceoverData.audioUrl && !voiceoverData.audioBase64) {
+                            console.log('📥 Loading audio from URL (fast):', voiceoverData.audioUrl);
+                            audioSrc = voiceoverData.audioUrl;
+
+                            // Convert URL to base64 for video creation
+                            const audioResponse = await fetch(voiceoverData.audioUrl);
+                            const audioBlob = await audioResponse.blob();
+                            const reader = new FileReader();
+                            await new Promise((resolve) => {
+                                reader.onloadend = () => {
+                                    state.audioBase64 = reader.result;
+                                    console.log('✅ Audio converted to base64');
+                                    resolve();
+                                };
+                                reader.readAsDataURL(audioBlob);
+                            });
+                        } else {
+                            state.audioBase64 = voiceoverData.audioBase64;
+                        }
 
                         // CRITICAL: Detect REAL audio duration from generated file
                         const audio = new Audio();
-                        audio.src = voiceoverData.audioBase64;
+                        audio.src = audioSrc;
 
                         await new Promise((resolve) => {
                             audio.onloadedmetadata = () => {
