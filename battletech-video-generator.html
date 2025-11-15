@@ -590,6 +590,9 @@
                 }
 
                 console.log('✅ Provider buttons enabled based on API key availability');
+
+                // Show default selection visually (fal is default)
+                updateProviderSelection();
             } catch (error) {
                 console.error('❌ Failed to check provider availability:', error);
             }
@@ -597,6 +600,71 @@
 
         // Check provider availability on page load
         checkProviderAvailability();
+
+        // Track selected image provider (default: fal)
+        let selectedImageProvider = 'fal';
+
+        // Add click handlers for provider selection
+        providerFal.addEventListener('click', () => {
+            if (!providerFal.disabled) {
+                selectedImageProvider = 'fal';
+                updateProviderSelection();
+            }
+        });
+
+        providerGemini.addEventListener('click', () => {
+            if (!providerGemini.disabled) {
+                selectedImageProvider = 'gemini';
+                updateProviderSelection();
+            }
+        });
+
+        providerPollinations.addEventListener('click', () => {
+            if (!providerPollinations.disabled) {
+                selectedImageProvider = 'pollinations';
+                updateProviderSelection();
+            }
+        });
+
+        providerStability.addEventListener('click', () => {
+            if (!providerStability.disabled) {
+                selectedImageProvider = 'stability';
+                updateProviderSelection();
+            }
+        });
+
+        // Update visual styling to show selected provider
+        function updateProviderSelection() {
+            // Update state.imageProvider to match selection
+            state.imageProvider = selectedImageProvider;
+
+            // Reset all enabled buttons to unselected state
+            if (!providerFal.disabled) {
+                providerFal.className = 'bg-gray-600 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-gray-500 text-xs';
+            }
+            if (!providerGemini.disabled) {
+                providerGemini.className = 'bg-gray-600 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-gray-500 text-xs';
+            }
+            if (!providerPollinations.disabled) {
+                providerPollinations.className = 'bg-gray-600 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-gray-500 text-xs';
+            }
+            if (!providerStability.disabled) {
+                providerStability.className = 'bg-gray-600 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-gray-500 text-xs';
+            }
+
+            // Highlight selected provider with its brand color + ring
+            if (selectedImageProvider === 'fal') {
+                providerFal.className = 'bg-orange-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-orange-600 text-xs ring-4 ring-orange-400';
+            } else if (selectedImageProvider === 'gemini') {
+                providerGemini.className = 'bg-blue-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-blue-600 text-xs ring-4 ring-blue-400';
+            } else if (selectedImageProvider === 'pollinations') {
+                providerPollinations.className = 'bg-pink-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-pink-600 text-xs ring-4 ring-pink-400';
+            } else if (selectedImageProvider === 'stability') {
+                providerStability.className = 'bg-purple-700 text-white font-bold py-2 px-3 rounded-lg transition-all hover:bg-purple-600 text-xs ring-4 ring-purple-400';
+            }
+
+            console.log('🎨 Selected image provider:', selectedImageProvider);
+        }
 
         // Manual image upload elements
         const useAutoGeneration = document.getElementById('useAutoGeneration');
