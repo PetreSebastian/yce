@@ -1441,7 +1441,23 @@
                         const voiceoverData = await voiceoverResponse.json();
 
                         state.audioBase64 = voiceoverData.audioBase64;
-                        state.audioDuration = 120; // fallback
+
+                        // CRITICAL: Detect REAL audio duration from generated file
+                        const audio = new Audio();
+                        audio.src = voiceoverData.audioBase64;
+
+                        await new Promise((resolve) => {
+                            audio.onloadedmetadata = () => {
+                                state.audioDuration = Math.floor(audio.duration);
+                                console.log(`✅ Audio duration detected: ${state.audioDuration}s (${(state.audioDuration / 60).toFixed(1)} min)`);
+                                resolve();
+                            };
+                            audio.onerror = () => {
+                                console.error('⚠️ Could not detect audio duration, using 120s fallback');
+                                state.audioDuration = 120;
+                                resolve();
+                            };
+                        });
 
                         updateStepStatus('voiceover', 'complete');
                         console.log('✅ TTS generated');
