@@ -372,10 +372,11 @@ REQUIREMENTS:
 - Focus on dramatic, atmospheric, and visually striking scenes
 - Include BattleMech models, environments, lighting details
 - Use "1950s EC Comics horror style" for each prompt
+- CRITICAL: NO text, NO numbers, NO letters, NO signs, NO readable text visible in the scene
 - Number each prompt (1., 2., 3., etc.)
 
 FORMAT EXAMPLE:
-1. 1950s EC Comics horror style: Atlas BattleMech stands in dimly lit maintenance bay, orange auxiliary lights casting dramatic shadows across damaged armor.
+1. 1950s EC Comics horror style: Atlas BattleMech stands in dimly lit maintenance bay, orange auxiliary lights casting dramatic shadows across damaged armor, no text or numbers visible.
 
 Generate exactly ${targetCount} prompts following this format:`;
 
@@ -840,6 +841,9 @@ app.post('/api/generate/gemini', async (req, res) => {
       console.log(`Generating image ${i + 1}/${prompts.length}...`);
 
       try {
+        // Add "no text, no numbers" to prompt
+        const enhancedPrompt = `${prompts[i]}, no text, no numbers, no letters, no signs`;
+
         const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
           method: 'POST',
           headers: {
@@ -848,7 +852,7 @@ app.post('/api/generate/gemini', async (req, res) => {
           body: JSON.stringify({
             contents: [{
               parts: [{
-                text: prompts[i]
+                text: enhancedPrompt
               }]
             }],
             generationConfig: {
@@ -1086,6 +1090,9 @@ app.post('/api/generate/fal', async (req, res) => {
       console.log(`🎨 Generating image ${i + 1}/${prompts.length}...`);
 
       try {
+        // Add "no text, no numbers" to prompt
+        const enhancedPrompt = `${prompts[i]}, no text, no numbers, no letters, no signs`;
+
         const response = await fetch(FAL_API_URL, {
           method: 'POST',
           headers: {
@@ -1093,7 +1100,7 @@ app.post('/api/generate/fal', async (req, res) => {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            prompt: prompts[i],
+            prompt: enhancedPrompt,
             image_size: {
               width: 1024,
               height: 1024
@@ -1187,7 +1194,9 @@ app.post('/api/generate/pollinations', async (req, res) => {
     async function generateImageWithRetry(prompt, index, maxRetries = 5) {
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-          const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&nologo=true&enhance=true&seed=${Date.now() + index + attempt}`;
+          // Add "no text, no numbers" to prompt
+          const enhancedPrompt = `${prompt}, no text, no numbers, no letters, no signs`;
+          const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=1024&height=1024&nologo=true&enhance=true&seed=${Date.now() + index + attempt}`;
 
           // Quick HEAD check to verify URL works
           const response = await fetch(imageUrl, {
@@ -1552,19 +1561,20 @@ app.post('/api/create-video', async (req, res) => {
       console.log(`🎬 Creating segment ${i + 1}/${imagePaths.length} (${progressPercent}%) with effect: ${effect}...`);
 
       // BREATHING ZOOM EFFECT - PERFECTLY CENTERED, ZERO MOVEMENT!
-      // Stability AI: 1280x720 (native 16:9) → scale to 1920x1080
-      // Other providers: 1024x1024 → scale and crop
-      const totalFrames = adjustedInterval * 24;
+      // Scale to 1920x1080, then zoom in center ONLY (NO PAN!)
+      const FPS = 24; // MUST match fps in filter!
+      const totalFrames = adjustedInterval * FPS;
       const midFrame = totalFrames / 2;
 
       let filter = '';
 
       if (effect === 'zoomIn') {
-        // SUBTLE ZOOM IN - 1.0 to 1.03x (3% zoom) + PARTICLES - CENTERED, NO PAN!
-        filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='if(lte(on,${midFrame}),1.0+0.03*on/${midFrame},1.03-0.03*(on-${midFrame})/${midFrame})':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${totalFrames}:s=1920x1080:fps=20,noise=alls=3:allf=t:c0s=10:c0f=a`;
+        // ZOOM IN first half, ZOOM OUT second half - PERFECTLY CENTERED, ZERO MOVEMENT!
+        // crop=(out_w):(out_h):(x):(y) where x=(in_w-out_w)/2 centers horizontally
+        filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080:(iw-1920)/2:(ih-1080)/2,zoompan=z='if(lte(on,${midFrame}),1.0+0.03*on/${midFrame},1.03-0.03*(on-${midFrame})/${midFrame})':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${totalFrames}:s=1920x1080:fps=${FPS},noise=alls=5:allf=t+u:c0s=15:c0f=a+t`;
       } else {
-        // SUBTLE ZOOM OUT - 1.03 to 1.0x (3% zoom) + PARTICLES - CENTERED, NO PAN!
-        filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='if(lte(on,${midFrame}),1.03-0.03*on/${midFrame},1.0+0.03*(on-${midFrame})/${midFrame})':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${totalFrames}:s=1920x1080:fps=20,noise=alls=3:allf=t:c0s=10:c0f=a`;
+        // ZOOM OUT first half, ZOOM IN second half - PERFECTLY CENTERED, ZERO MOVEMENT!
+        filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080:(iw-1920)/2:(ih-1080)/2,zoompan=z='if(lte(on,${midFrame}),1.03-0.03*on/${midFrame},1.0+0.03*(on-${midFrame})/${midFrame})':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${totalFrames}:s=1920x1080:fps=${FPS},noise=alls=5:allf=t+u:c0s=15:c0f=a+t`;
       }
 
       // Create segment with effect - ULTRAFAST for SPEED!
@@ -1648,7 +1658,7 @@ app.post('/api/create-video', async (req, res) => {
         '-crf', '26',
         '-c:a', 'aac',
         '-b:a', '128k',
-        '-shortest',
+        // DO NOT use -shortest! Video duration should match audio exactly from calculation
         '-y',
         finalVideoPath
       ]);
