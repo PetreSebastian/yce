@@ -54,9 +54,47 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 // ============================================================
-// JOB STORAGE FOR ASYNC VIDEO GENERATION
+// JOB STORAGE FOR ASYNC VIDEO GENERATION (PERSISTENT!)
 // ============================================================
 const jobs = new Map(); // jobId => { status, progress, videoUrl, error, createdAt }
+const jobsDir = path.join(tempDir, 'jobs');
+
+// Ensure jobs directory exists
+if (!fs.existsSync(jobsDir)) {
+  fs.mkdirSync(jobsDir, { recursive: true });
+}
+
+// Load existing jobs from disk on startup
+function loadJobsFromDisk() {
+  try {
+    const files = fs.readdirSync(jobsDir);
+    for (const file of files) {
+      if (file.endsWith('.json')) {
+        const jobPath = path.join(jobsDir, file);
+        const jobData = JSON.parse(fs.readFileSync(jobPath, 'utf8'));
+        jobData.createdAt = new Date(jobData.createdAt); // Convert back to Date
+        jobs.set(jobData.id, jobData);
+        console.log(`📂 Loaded job from disk: ${jobData.id}`);
+      }
+    }
+    console.log(`✅ Loaded ${jobs.size} jobs from disk`);
+  } catch (error) {
+    console.error('⚠️ Error loading jobs from disk:', error.message);
+  }
+}
+
+// Save job to disk
+function saveJobToDisk(jobId) {
+  try {
+    const job = jobs.get(jobId);
+    if (job) {
+      const jobPath = path.join(jobsDir, `${jobId}.json`);
+      fs.writeFileSync(jobPath, JSON.stringify(job, null, 2));
+    }
+  } catch (error) {
+    console.error(`⚠️ Error saving job ${jobId} to disk:`, error.message);
+  }
+}
 
 function createJob(data) {
   const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -69,6 +107,7 @@ function createJob(data) {
     createdAt: new Date(),
     data: data
   });
+  saveJobToDisk(jobId); // Persist to disk immediately
   console.log(`✅ Job created: ${jobId}`);
   return jobId;
 }
@@ -77,6 +116,7 @@ function updateJobStatus(jobId, updates) {
   const job = jobs.get(jobId);
   if (job) {
     Object.assign(job, updates);
+    saveJobToDisk(jobId); // Persist changes to disk
     console.log(`📊 Job ${jobId}: status=${job.status}, progress=${job.progress}%`);
   }
 }
@@ -91,10 +131,24 @@ setInterval(() => {
   for (const [jobId, job] of jobs.entries()) {
     if (job.createdAt.getTime() < twoHoursAgo) {
       console.log(`🧹 Cleaning up old job: ${jobId}`);
+
+      // Delete job file from disk
+      try {
+        const jobPath = path.join(jobsDir, `${jobId}.json`);
+        if (fs.existsSync(jobPath)) {
+          fs.unlinkSync(jobPath);
+        }
+      } catch (error) {
+        console.error(`⚠️ Error deleting job file ${jobId}:`, error.message);
+      }
+
       jobs.delete(jobId);
     }
   }
 }, 30 * 60 * 1000); // Run every 30 minutes
+
+// Load jobs on startup
+loadJobsFromDisk();
 
 // Parse script and extract scene descriptions for image generation
 function parseScriptForScenes(scriptText) {
