@@ -1485,11 +1485,11 @@ app.post('/api/create-video', async (req, res) => {
       let filter = '';
 
       if (effect === 'zoomIn') {
-        // SUBTLE ZOOM - 1.0 to 1.03x (3% zoom - professional look!)
-        filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='if(lte(on,${midFrame}),1.0+0.03*on/${midFrame},1.03-0.03*(on-${midFrame})/${midFrame})':x=iw/2-(iw/zoom)/2:y=ih/2-(ih/zoom)/2:d=${totalFrames}:s=1920x1080:fps=20`;
+        // SUBTLE ZOOM IN - 1.0 to 1.03x (3% zoom) + PARTICLES - CENTERED, NO PAN!
+        filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='if(lte(on,${midFrame}),1.0+0.03*on/${midFrame},1.03-0.03*(on-${midFrame})/${midFrame})':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${totalFrames}:s=1920x1080:fps=20,noise=alls=3:allf=t:c0s=10:c0f=a`;
       } else {
-        // SUBTLE ZOOM OUT - 1.03 to 1.0x (3% zoom - professional look!)
-        filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='if(lte(on,${midFrame}),1.03-0.03*on/${midFrame},1.0+0.03*(on-${midFrame})/${midFrame})':x=iw/2-(iw/zoom)/2:y=ih/2-(ih/zoom)/2:d=${totalFrames}:s=1920x1080:fps=20`;
+        // SUBTLE ZOOM OUT - 1.03 to 1.0x (3% zoom) + PARTICLES - CENTERED, NO PAN!
+        filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='if(lte(on,${midFrame}),1.03-0.03*on/${midFrame},1.0+0.03*(on-${midFrame})/${midFrame})':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${totalFrames}:s=1920x1080:fps=20,noise=alls=3:allf=t:c0s=10:c0f=a`;
       }
 
       // Create segment with effect - ULTRAFAST for SPEED!
@@ -1612,11 +1612,11 @@ app.post('/api/create-video', async (req, res) => {
         }
       });
 
-      // Add 10-minute timeout for safety
+      // Add 60-minute timeout for very long videos (50+ min audio)
       setTimeout(() => {
         ffmpeg.kill('SIGKILL');
-        reject(new Error('FFmpeg timeout after 10 minutes'));
-      }, 600000);
+        reject(new Error('FFmpeg timeout after 60 minutes'));
+      }, 3600000);
     });
 
     // Move final video to accessible location
@@ -1924,11 +1924,11 @@ async function processVideoJob(jobId) {
     let filter = '';
 
     if (effect === 'zoomIn') {
-      // SUBTLE ZOOM - 1.0 to 1.03x (3% zoom - professional look!)
-      filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='if(lte(on,${midFrame}),1.0+0.03*on/${midFrame},1.03-0.03*(on-${midFrame})/${midFrame})':x=iw/2-(iw/zoom)/2:y=ih/2-(ih/zoom)/2:d=${totalFrames}:s=1920x1080:fps=20`;
+      // SUBTLE ZOOM IN - 1.0 to 1.03x (3% zoom) + PARTICLES - CENTERED, NO PAN!
+      filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='if(lte(on,${midFrame}),1.0+0.03*on/${midFrame},1.03-0.03*(on-${midFrame})/${midFrame})':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${totalFrames}:s=1920x1080:fps=20,noise=alls=3:allf=t:c0s=10:c0f=a`;
     } else {
-      // SUBTLE ZOOM OUT - 1.03 to 1.0x (3% zoom - professional look!)
-      filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='if(lte(on,${midFrame}),1.03-0.03*on/${midFrame},1.0+0.03*(on-${midFrame})/${midFrame})':x=iw/2-(iw/zoom)/2:y=ih/2-(ih/zoom)/2:d=${totalFrames}:s=1920x1080:fps=20`;
+      // SUBTLE ZOOM OUT - 1.03 to 1.0x (3% zoom) + PARTICLES - CENTERED, NO PAN!
+      filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='if(lte(on,${midFrame}),1.03-0.03*on/${midFrame},1.0+0.03*(on-${midFrame})/${midFrame})':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${totalFrames}:s=1920x1080:fps=20,noise=alls=3:allf=t:c0s=10:c0f=a`;
     }
 
     // Create segment with effect - ULTRAFAST for SPEED!
@@ -2063,12 +2063,12 @@ async function processVideoJob(jobId) {
       }
     });
 
-    // Add 15-minute timeout for very long videos
+    // Add 60-minute timeout for very long videos (50+ min audio)
     const timeout = setTimeout(() => {
-      console.error('⏱️ FFmpeg timeout after 15 minutes - killing process');
+      console.error('⏱️ FFmpeg timeout after 60 minutes - killing process');
       ffmpeg.kill('SIGKILL');
-      reject(new Error('FFmpeg timeout after 15 minutes'));
-    }, 900000);
+      reject(new Error('FFmpeg timeout after 60 minutes'));
+    }, 3600000);
 
     // Clear timeout if process finishes
     ffmpeg.on('close', () => clearTimeout(timeout));
