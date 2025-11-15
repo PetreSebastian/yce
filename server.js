@@ -60,9 +60,10 @@ require('dotenv').config();
 const GENAIPRO_JWT = process.env.GENAIPRO_JWT || '';
 const GENAIPRO_BASE_URL = 'https://genaipro.vn/api/v1';
 
-// Google Gemini Imagen configuration
+// Google Gemini 2.5 Flash Image configuration (NEW model for native image generation!)
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:generate';
+const GEMINI_MODEL = 'gemini-2.5-flash-image';
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 // Fal.ai configuration (Flux Schnell - FAST & CHEAP!)
 const FAL_API_KEY = process.env.FAL_API_KEY || '';
@@ -334,7 +335,7 @@ app.get('/health', (req, res) => {
 app.get('/api/providers-status', (req, res) => {
   res.json({
     pollinations: true, // Always available (free, no key needed)
-    gemini: false, // Disabled - Gemini API key only works for text, not images
+    gemini: GEMINI_API_KEY && GEMINI_API_KEY.length > 0, // NOW WORKS with Gemini 2.5 Flash Image!
     fal: FAL_API_KEY && FAL_API_KEY.length > 0,
     stability: STABILITY_API_KEY && STABILITY_API_KEY.length > 0
   });
@@ -778,9 +779,9 @@ app.post('/api/generate-voiceover', async (req, res) => {
   }
 });
 
-// Generate images with Google Gemini Imagen
+// Generate images with Google Gemini 2.5 Flash Image (NEW!)
 app.post('/api/generate/gemini', async (req, res) => {
-  console.log('\n🎨 Gemini Imagen generation request received...');
+  console.log('\n🎨 Gemini 2.5 Flash Image generation request received...');
 
   try {
     const { prompts } = req.body;
@@ -789,7 +790,7 @@ app.post('/api/generate/gemini', async (req, res) => {
       return res.status(400).json({ error: 'Prompts array is required' });
     }
 
-    console.log(`📝 Generating ${prompts.length} images with Gemini Imagen 3.0...`);
+    console.log(`📝 Generating ${prompts.length} images with Gemini 2.5 Flash Image ($15 FREE credits!)...`);
 
     const images = [];
 
@@ -803,19 +804,17 @@ app.post('/api/generate/gemini', async (req, res) => {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            prompt: prompts[i],
-            numberofImages: 1,
-            aspectRatio: '16:9',
-            safetySettings: [
-              {
-                category: 'HARM_CATEGORY_HATE_SPEECH',
-                threshold: 'BLOCK_ONLY_HIGH'
-              },
-              {
-                category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-                threshold: 'BLOCK_ONLY_HIGH'
+            contents: [{
+              parts: [{
+                text: prompts[i]
+              }]
+            }],
+            generationConfig: {
+              response_modalities: ['IMAGE'], // Only generate images, no text
+              image_config: {
+                aspect_ratio: '16:9' // Full HD landscape
               }
-            ]
+            }
           })
         });
 
@@ -825,27 +824,37 @@ app.post('/api/generate/gemini', async (req, res) => {
 
           // If billing not enabled, give helpful error
           if (errorText.includes('billing') || errorText.includes('quota') || response.status === 403) {
-            throw new Error('Gemini Imagen requires billing to be enabled. Please add a payment method at https://console.cloud.google.com/billing');
+            throw new Error('Gemini requires billing to be enabled. Please add a payment method at https://console.cloud.google.com/billing');
           }
 
-          throw new Error(`Gemini API failed: ${response.status}`);
+          throw new Error(`Gemini API failed: ${response.status} - ${errorText}`);
         }
 
         const data = await response.json();
 
-        // Gemini returns base64 image in generatedImages array
-        if (data.generatedImages && data.generatedImages.length > 0) {
-          const imageBase64 = data.generatedImages[0].imageData;
+        // Gemini 2.5 returns image in candidates[0].content.parts[].inline_data
+        let imageBase64 = null;
+        if (data.candidates && data.candidates[0]?.content?.parts) {
+          for (const part of data.candidates[0].content.parts) {
+            if (part.inline_data && part.inline_data.mime_type?.startsWith('image/')) {
+              imageBase64 = part.inline_data.data;
+              break;
+            }
+          }
+        }
+
+        if (imageBase64) {
           images.push({
             image: `data:image/png;base64,${imageBase64}`,
             prompt: prompts[i]
           });
-          console.log(`Image ${i + 1}/${prompts.length} generated successfully`);
+          console.log(`✅ Image ${i + 1}/${prompts.length} generated successfully`);
         } else {
+          console.error(`❌ No image data found in response for image ${i + 1}`);
           throw new Error('No image data in Gemini response');
         }
 
-        // Rate limit: wait 1 second between requests
+        // Rate limit: wait 1 second between requests to avoid quota errors
         if (i < prompts.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
@@ -861,7 +870,8 @@ app.post('/api/generate/gemini', async (req, res) => {
       }
     }
 
-    console.log(`✅ Generated ${images.filter(img => img.image).length}/${prompts.length} images with Gemini`);
+    const successCount = images.filter(img => img.image).length;
+    console.log(`✅ Generated ${successCount}/${prompts.length} images with Gemini 2.5 Flash`);
 
     res.json({
       success: true,
