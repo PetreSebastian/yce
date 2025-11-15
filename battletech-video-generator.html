@@ -510,6 +510,9 @@
     </div>
 
     <script>
+        // API Base URL - works both locally and on Render.com
+        const API_BASE_URL = window.location.origin;
+
         // State
         let state = {
             videoTitle: '',
@@ -619,7 +622,7 @@
             generatePromptsBtn.textContent = '🔄 Extracting scenes from script...';
 
             try {
-                const response = await fetch('http://localhost:3000/api/extract-prompts', {
+                const response = await fetch(`${API_BASE_URL}/api/extract-prompts`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -780,7 +783,7 @@
             autoGenerateScriptBtn.innerHTML = '⏳ Generating script with Gemini...';
 
             try {
-                const response = await fetch('http://localhost:3000/api/generate-script', {
+                const response = await fetch(`${API_BASE_URL}/api/generate-script`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -938,7 +941,7 @@
 
             try {
                 // Parse script to get first scene
-                const parseResponse = await fetch('http://localhost:3000/api/parse-script', {
+                const parseResponse = await fetch(`${API_BASE_URL}/api/parse-script`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -960,13 +963,13 @@
 
                 let imageEndpoint;
                 if (state.imageProvider === 'stability') {
-                    imageEndpoint = 'http://localhost:3000/api/generate/stability';
+                    imageEndpoint = `${API_BASE_URL}/api/generate/stability`;
                 } else if (state.imageProvider === 'fal') {
-                    imageEndpoint = 'http://localhost:3000/api/generate/fal';
+                    imageEndpoint = `${API_BASE_URL}/api/generate/fal`;
                 } else if (state.imageProvider === 'gemini') {
-                    imageEndpoint = 'http://localhost:3000/api/generate/gemini';
+                    imageEndpoint = `${API_BASE_URL}/api/generate/gemini`;
                 } else {
-                    imageEndpoint = 'http://localhost:3000/api/generate/pollinations';
+                    imageEndpoint = `${API_BASE_URL}/api/generate/pollinations`;
                 }
 
                 const imageResponse = await fetch(imageEndpoint, {
@@ -1006,7 +1009,7 @@
 
                 } else {
                     // URL image - download via server as before
-                    const downloadResponse = await fetch('http://localhost:3000/api/download-thumbnail', {
+                    const downloadResponse = await fetch(`${API_BASE_URL}/api/download-thumbnail`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -1063,7 +1066,7 @@
 
             try {
                 // Check server
-                const healthCheck = await fetch('http://localhost:3000/health');
+                const healthCheck = await fetch(`${API_BASE_URL}/health`);
                 if (!healthCheck.ok) {
                     throw new Error('Backend server not running! Start with: npm start');
                 }
@@ -1089,7 +1092,7 @@
                     document.getElementById('overallProgressBar').style.width = '10%';
                     document.getElementById('overallProgress').textContent = '10%';
 
-                    const parseResponse = await fetch('http://localhost:3000/api/parse-script', {
+                    const parseResponse = await fetch(`${API_BASE_URL}/api/parse-script`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -1139,13 +1142,13 @@
 
                     let imageEndpoint;
                     if (state.imageProvider === 'stability') {
-                        imageEndpoint = 'http://localhost:3000/api/generate/stability';
+                        imageEndpoint = `${API_BASE_URL}/api/generate/stability`;
                     } else if (state.imageProvider === 'fal') {
-                        imageEndpoint = 'http://localhost:3000/api/generate/fal';
+                        imageEndpoint = `${API_BASE_URL}/api/generate/fal`;
                     } else if (state.imageProvider === 'gemini') {
-                        imageEndpoint = 'http://localhost:3000/api/generate/gemini';
+                        imageEndpoint = `${API_BASE_URL}/api/generate/gemini`;
                     } else {
-                        imageEndpoint = 'http://localhost:3000/api/generate/pollinations';
+                        imageEndpoint = `${API_BASE_URL}/api/generate/pollinations`;
                     }
 
                     const imagesResponse = await fetch(imageEndpoint, {
@@ -1230,7 +1233,7 @@
                     document.getElementById('currentStep').textContent = 'Generating voiceover...';
 
                     try {
-                        const voiceoverResponse = await fetch('http://localhost:3000/api/generate-voiceover', {
+                        const voiceoverResponse = await fetch(`${API_BASE_URL}/api/generate-voiceover`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ text: state.script })
@@ -1262,7 +1265,7 @@
 
                 const imageInterval = Math.floor(state.audioDuration / state.generatedImages.length);
 
-                const videoResponse = await fetch('http://localhost:3000/api/create-video', {
+                const videoResponse = await fetch(`${API_BASE_URL}/api/create-video`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
