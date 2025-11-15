@@ -71,10 +71,11 @@ function loadJobsFromDisk() {
     for (const file of files) {
       if (file.endsWith('.json')) {
         const jobPath = path.join(jobsDir, file);
-        const jobData = JSON.parse(fs.readFileSync(jobPath, 'utf8'));
-        jobData.createdAt = new Date(jobData.createdAt); // Convert back to Date
-        jobs.set(jobData.id, jobData);
-        console.log(`📂 Loaded job from disk: ${jobData.id}`);
+        const jobMetadata = JSON.parse(fs.readFileSync(jobPath, 'utf8'));
+        jobMetadata.createdAt = new Date(jobMetadata.createdAt); // Convert back to Date
+        jobMetadata.data = null; // Data was not persisted, set to null
+        jobs.set(jobMetadata.id, jobMetadata);
+        console.log(`📂 Loaded job metadata from disk: ${jobMetadata.id} (status: ${jobMetadata.status})`);
       }
     }
     console.log(`✅ Loaded ${jobs.size} jobs from disk`);
@@ -83,13 +84,23 @@ function loadJobsFromDisk() {
   }
 }
 
-// Save job to disk
+// Save job to disk (EXCLUDING large 'data' field for speed!)
 function saveJobToDisk(jobId) {
   try {
     const job = jobs.get(jobId);
     if (job) {
+      // Only save metadata, NOT the data payload (can be 100-200MB!)
+      const jobMetadata = {
+        id: job.id,
+        status: job.status,
+        progress: job.progress,
+        videoUrl: job.videoUrl,
+        error: job.error,
+        createdAt: job.createdAt
+        // Explicitly EXCLUDE job.data to avoid huge disk writes
+      };
       const jobPath = path.join(jobsDir, `${jobId}.json`);
-      fs.writeFileSync(jobPath, JSON.stringify(job, null, 2));
+      fs.writeFileSync(jobPath, JSON.stringify(jobMetadata, null, 2));
     }
   } catch (error) {
     console.error(`⚠️ Error saving job ${jobId} to disk:`, error.message);
