@@ -840,13 +840,13 @@ app.post('/api/generate-voiceover', async (req, res) => {
     // Step 2: Poll task status until completion
     let taskStatus = null;
     let attempts = 0;
-    // Dynamic timeout: ~1 second per 30 chars + 2 min buffer, max 10 min
+    // Dynamic timeout: ~1 second per 30 chars + 2 min buffer
     const estimatedTime = Math.ceil(processedText.length / 30) + 120;
-    const maxAttempts = Math.min(600, estimatedTime); // Up to 10 minutes
 
-    console.log(`⏱️ Text: ${processedText.length} chars, Estimated: ${estimatedTime}s, Timeout: ${maxAttempts}s`);
+    console.log(`⏱️ Text: ${processedText.length} chars, Estimated: ~${Math.ceil(estimatedTime / 60)} minutes`);
+    console.log('⏳ Waiting for task completion (will keep retrying until done)...');
 
-    while (attempts < maxAttempts) {
+    while (true) { // Keep polling indefinitely until completed or failed
       await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
 
       const statusResponse = await fetch(`${GENAIPRO_BASE_URL}/labs/task/${taskId}`, {
@@ -857,7 +857,7 @@ app.post('/api/generate-voiceover', async (req, res) => {
       });
 
       if (!statusResponse.ok) {
-        console.error('Failed to check task status');
+        console.error('Failed to check task status, retrying...');
         attempts++;
         continue;
       }
@@ -865,23 +865,23 @@ app.post('/api/generate-voiceover', async (req, res) => {
       taskStatus = await statusResponse.json();
 
       if (taskStatus.status === 'completed') {
-        console.log('✅ Voiceover generation completed!');
+        console.log(`✅ Voiceover generation completed after ${attempts}s!`);
         break;
       } else if (taskStatus.status === 'failed') {
         throw new Error('Task failed: ' + (taskStatus.error || 'Unknown error'));
       }
 
       attempts++;
-      if (attempts % 10 === 0) {
-        console.log(`⏳ Still processing... (${attempts}s elapsed, max ${maxAttempts}s)`);
-      }
-    }
 
-    if (!taskStatus || taskStatus.status !== 'completed') {
-      // Don't throw error immediately - log task ID so user can check manually
-      console.error(`⚠️ TIMEOUT after ${maxAttempts}s, but task may still complete on GenAIPro!`);
-      console.error(`📋 Task ID: ${taskId} - Check status manually at GenAIPro dashboard`);
-      throw new Error(`Task timeout after ${maxAttempts}s. Task ID: ${taskId}. The audio may still be generating - check GenAIPro dashboard.`);
+      // Log progress every 10 seconds
+      if (attempts % 10 === 0) {
+        console.log(`⏳ Still processing... (${attempts}s elapsed)`);
+      }
+
+      // Warn if taking longer than expected
+      if (attempts === estimatedTime) {
+        console.log(`⚠️ Taking longer than estimated (${estimatedTime}s), but continuing to wait...`);
+      }
     }
 
     // Step 3: Download the audio file
