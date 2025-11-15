@@ -53,6 +53,49 @@ const STABILITY_API_URL = 'https://api.stability.ai/v1/generation/stable-diffusi
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
+// ============================================================
+// JOB STORAGE FOR ASYNC VIDEO GENERATION
+// ============================================================
+const jobs = new Map(); // jobId => { status, progress, videoUrl, error, createdAt }
+
+function createJob(data) {
+  const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  jobs.set(jobId, {
+    id: jobId,
+    status: 'queued', // queued, processing, completed, failed
+    progress: 0,
+    videoUrl: null,
+    error: null,
+    createdAt: new Date(),
+    data: data
+  });
+  console.log(`✅ Job created: ${jobId}`);
+  return jobId;
+}
+
+function updateJobStatus(jobId, updates) {
+  const job = jobs.get(jobId);
+  if (job) {
+    Object.assign(job, updates);
+    console.log(`📊 Job ${jobId}: status=${job.status}, progress=${job.progress}%`);
+  }
+}
+
+function getJob(jobId) {
+  return jobs.get(jobId);
+}
+
+// Clean up old jobs (older than 2 hours)
+setInterval(() => {
+  const twoHoursAgo = Date.now() - (2 * 60 * 60 * 1000);
+  for (const [jobId, job] of jobs.entries()) {
+    if (job.createdAt.getTime() < twoHoursAgo) {
+      console.log(`🧹 Cleaning up old job: ${jobId}`);
+      jobs.delete(jobId);
+    }
+  }
+}, 30 * 60 * 1000); // Run every 30 minutes
+
 // Parse script and extract scene descriptions for image generation
 function parseScriptForScenes(scriptText) {
   const scenes = [];
@@ -1491,6 +1534,347 @@ app.post('/api/create-video', async (req, res) => {
     });
   }
 });
+
+// ============================================================
+// ASYNC VIDEO GENERATION ENDPOINTS
+// ============================================================
+
+// Start async video generation
+app.post('/api/create-video-async', async (req, res) => {
+  console.log('\n🎬 ASYNC video creation request received...');
+
+  try {
+    // Create job
+    const jobId = createJob(req.body);
+
+    // Return job ID immediately
+    res.json({
+      success: true,
+      jobId: jobId,
+      message: 'Video generation started. Use /api/job-status/:jobId to check progress.'
+    });
+
+    // Start processing in background (don't await!)
+    processVideoJob(jobId).catch(err => {
+      console.error(`❌ Job ${jobId} failed:`, err);
+      updateJobStatus(jobId, {
+        status: 'failed',
+        error: err.message
+      });
+    });
+
+  } catch (error) {
+    console.error('❌ Error creating job:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Check job status
+app.get('/api/job-status/:jobId', (req, res) => {
+  const { jobId } = req.params;
+  const job = getJob(jobId);
+
+  if (!job) {
+    return res.status(404).json({
+      success: false,
+      error: 'Job not found'
+    });
+  }
+
+  res.json({
+    success: true,
+    job: {
+      id: job.id,
+      status: job.status,
+      progress: job.progress,
+      videoUrl: job.videoUrl,
+      error: job.error
+    }
+  });
+});
+
+// Background video processing function
+async function processVideoJob(jobId) {
+  const job = getJob(jobId);
+  if (!job) {
+    throw new Error('Job not found');
+  }
+
+  updateJobStatus(jobId, { status: 'processing', progress: 5 });
+
+  const { images, effects: imageEffects, audioBase64, imageInterval, audioDuration } = job.data;
+
+  if (!images || !Array.isArray(images) || images.length === 0) {
+    throw new Error('Images array is required');
+  }
+
+  if (!audioBase64) {
+    throw new Error('Audio file is required');
+  }
+
+  console.log(`📊 Job ${jobId}: Processing ${images.length} images with ${imageInterval}s interval`);
+
+  // DUPLICATE IMAGES x2 but KEEP SAME TOTAL VIDEO DURATION
+  const originalCount = images.length;
+  const duplicatedImages = [...images, ...images]; // x2 duplication
+
+  // CRITICAL: Adjust interval so total duration = audio duration
+  const adjustedInterval = audioDuration / duplicatedImages.length;
+
+  console.log(`🔄 Image distribution:`);
+  console.log(`   Original: ${originalCount} images`);
+  console.log(`   Duplicated: ${duplicatedImages.length} images`);
+  console.log(`   Audio duration: ${audioDuration}s`);
+  console.log(`   Interval per image: ${adjustedInterval.toFixed(1)}s (was ${imageInterval}s)`);
+
+  // Also duplicate effects array to match
+  const originalEffects = imageEffects || [];
+  const duplicatedEffects = [...originalEffects, ...originalEffects];
+  while (duplicatedEffects.length < duplicatedImages.length) {
+    duplicatedEffects.push(duplicatedEffects[duplicatedEffects.length % originalEffects.length] || 'zoomIn');
+  }
+
+  const sessionId = Date.now();
+  const sessionDir = path.join(tempDir, `session_${sessionId}`);
+  await mkdir(sessionDir, { recursive: true });
+
+  updateJobStatus(jobId, { progress: 10 });
+
+  // Save audio file
+  console.log('💾 Saving audio file...');
+  const audioData = audioBase64.replace(/^data:audio\/\w+;base64,/, '');
+  const audioPath = path.join(sessionDir, 'audio.mp3');
+  await writeFile(audioPath, Buffer.from(audioData, 'base64'));
+
+  updateJobStatus(jobId, { progress: 15 });
+
+  // Download and save all images
+  console.log('💾 Downloading and saving images...');
+  const imagePaths = [];
+  for (let i = 0; i < duplicatedImages.length; i++) {
+    if (!duplicatedImages[i] || typeof duplicatedImages[i] !== 'string') {
+      console.error(`⚠️ Image ${i} is invalid (not a string), skipping...`);
+      continue;
+    }
+
+    const imagePath = path.join(sessionDir, `image_${i.toString().padStart(4, '0')}.png`);
+
+    try {
+      // Check if image is URL or base64
+      if (duplicatedImages[i].startsWith('http://') || duplicatedImages[i].startsWith('https://')) {
+        const imageResponse = await fetch(duplicatedImages[i], {
+          timeout: 30000,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
+        });
+
+        if (!imageResponse.ok) {
+          console.error(`⚠️ Failed to download image ${i}: HTTP ${imageResponse.status}`);
+          continue;
+        }
+
+        const imageBuffer = await imageResponse.buffer();
+
+        if (imageBuffer.length < 1000) {
+          console.error(`⚠️ Image ${i} is too small (${imageBuffer.length} bytes), probably invalid`);
+          continue;
+        }
+
+        await writeFile(imagePath, imageBuffer);
+      } else if (duplicatedImages[i].startsWith('data:image')) {
+        const imageData = duplicatedImages[i].replace(/^data:image\/\w+;base64,/, '');
+        await writeFile(imagePath, Buffer.from(imageData, 'base64'));
+      } else {
+        console.error(`⚠️ Image ${i} has unknown format, skipping...`);
+        continue;
+      }
+
+      imagePaths.push(imagePath);
+
+      // Update progress (15% to 30% for image downloading)
+      const downloadProgress = 15 + Math.round((i / duplicatedImages.length) * 15);
+      updateJobStatus(jobId, { progress: downloadProgress });
+    } catch (error) {
+      console.error(`❌ Error processing image ${i}:`, error.message);
+      continue;
+    }
+  }
+
+  if (imagePaths.length === 0) {
+    throw new Error('No valid images could be processed');
+  }
+
+  console.log(`✅ Saved ${imagePaths.length} images successfully`);
+  updateJobStatus(jobId, { progress: 30 });
+
+  // Create video segments with effects
+  console.log('🎨 Creating video segments with effects...');
+  const segmentPaths = [];
+
+  for (let i = 0; i < imagePaths.length; i++) {
+    const effect = duplicatedEffects[i] || 'zoomIn';
+    const segmentPath = path.join(sessionDir, `segment_${i.toString().padStart(4, '0')}.mp4`);
+
+    const totalFrames = adjustedInterval * 24;
+    const midFrame = totalFrames / 2;
+
+    let filter = '';
+
+    if (effect === 'zoomIn') {
+      filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='if(lte(on,${midFrame}),1.0+0.25*on/${midFrame},1.25-0.25*(on-${midFrame})/${midFrame})':x=iw/2-(iw/zoom)/2:y=ih/2-(ih/zoom)/2:d=${totalFrames}:s=1920x1080:fps=24`;
+    } else {
+      filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='if(lte(on,${midFrame}),1.25-0.25*on/${midFrame},1.0+0.25*(on-${midFrame})/${midFrame})':x=iw/2-(iw/zoom)/2:y=ih/2-(ih/zoom)/2:d=${totalFrames}:s=1920x1080:fps=24`;
+    }
+
+    // Create segment with effect
+    await new Promise((resolve, reject) => {
+      const ffmpeg = spawn('ffmpeg', [
+        '-loop', '1',
+        '-i', imagePaths[i],
+        '-vf', filter,
+        '-t', adjustedInterval.toString(),
+        '-c:v', 'libx264',
+        '-preset', 'veryfast',
+        '-crf', '28',
+        '-pix_fmt', 'yuv420p',
+        '-y',
+        segmentPath
+      ]);
+
+      let errorOutput = '';
+
+      ffmpeg.stderr.on('data', (data) => {
+        errorOutput += data.toString();
+      });
+
+      ffmpeg.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(new Error(`FFmpeg failed for segment ${i}: ${errorOutput}`));
+        }
+      });
+    });
+
+    segmentPaths.push(segmentPath);
+
+    // Update progress (30% to 70% for segment creation)
+    const segmentProgress = 30 + Math.round((i / imagePaths.length) * 40);
+    updateJobStatus(jobId, { progress: segmentProgress });
+  }
+
+  updateJobStatus(jobId, { progress: 70 });
+
+  // Create concat file for ffmpeg
+  console.log('📝 Creating concat file...');
+  const concatPath = path.join(sessionDir, 'concat.txt');
+  const concatContent = segmentPaths.map(p => `file '${path.basename(p)}'`).join('\n');
+  await writeFile(concatPath, concatContent);
+
+  // Concatenate all segments
+  console.log('🔗 Concatenating video segments...');
+  const videoOnlyPath = path.join(sessionDir, 'video_no_audio.mp4');
+
+  await new Promise((resolve, reject) => {
+    const ffmpeg = spawn('ffmpeg', [
+      '-f', 'concat',
+      '-safe', '0',
+      '-i', concatPath,
+      '-c', 'copy',
+      '-y',
+      videoOnlyPath
+    ], { cwd: sessionDir });
+
+    ffmpeg.on('close', (code) => {
+      if (code === 0) {
+        console.log('✅ Video segments concatenated');
+        resolve();
+      } else {
+        reject(new Error(`FFmpeg concat failed with code ${code}`));
+      }
+    });
+  });
+
+  updateJobStatus(jobId, { progress: 80 });
+
+  // Merge video with audio and add atmospheric effects
+  console.log('🎵 Merging video with audio and adding atmospheric effects...');
+  const finalVideoPath = path.join(sessionDir, 'final_video.mp4');
+
+  await new Promise((resolve, reject) => {
+    const ffmpeg = spawn('ffmpeg', [
+      '-i', videoOnlyPath,
+      '-i', audioPath,
+      '-filter_complex',
+      `[0:v]noise=alls=10:allf=t+u,eq=brightness=0.02:contrast=1.05:saturation=0.95[vout]`,
+      '-map', '[vout]',
+      '-map', '1:a',
+      '-c:v', 'libx264',
+      '-preset', 'veryfast',
+      '-crf', '26',
+      '-c:a', 'aac',
+      '-b:a', '128k',
+      '-shortest',
+      '-y',
+      finalVideoPath
+    ]);
+
+    ffmpeg.on('close', (code) => {
+      if (code === 0) {
+        console.log('✅ Audio merged with video + atmospheric effects added');
+        resolve();
+      } else {
+        reject(new Error(`FFmpeg merge with effects failed with code ${code}`));
+      }
+    });
+  });
+
+  updateJobStatus(jobId, { progress: 90 });
+
+  // Move final video to accessible location
+  console.log('📤 Preparing final video for download...');
+  const publicVideoName = `video_${sessionId}.mp4`;
+  const publicVideoPath = path.join(tempDir, publicVideoName);
+  fs.copyFileSync(finalVideoPath, publicVideoPath);
+
+  const videoUrl = `/temp/${publicVideoName}`;
+
+  // Clean up session folder (but keep the public video)
+  console.log('🧹 Cleaning up temporary files...');
+  setTimeout(() => {
+    try {
+      fs.rmSync(sessionDir, { recursive: true, force: true });
+      console.log('✅ Cleanup complete');
+    } catch (err) {
+      console.error('Cleanup error:', err.message);
+    }
+  }, 5000);
+
+  // Delete public video after 2 hours
+  setTimeout(() => {
+    try {
+      if (fs.existsSync(publicVideoPath)) {
+        fs.unlinkSync(publicVideoPath);
+        console.log(`🗑️ Deleted old video: ${publicVideoName}`);
+      }
+    } catch (err) {
+      console.error('Error deleting old video:', err.message);
+    }
+  }, 2 * 3600000);
+
+  // Mark job as completed
+  updateJobStatus(jobId, {
+    status: 'completed',
+    progress: 100,
+    videoUrl: videoUrl
+  });
+
+  console.log(`🎉 Job ${jobId} complete!\n`);
+}
 
 app.listen(PORT, () => {
   console.log('='.repeat(60));

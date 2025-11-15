@@ -1259,13 +1259,16 @@
                 document.getElementById('overallProgress').textContent = '70%';
                 console.log('✅ Step 3 complete - moving to video rendering...');
 
-                // Step 4: Render video
+                // Step 4: Render video (ASYNC with polling!)
                 updateStepStatus('video', 'active');
-                document.getElementById('currentStep').textContent = 'Rendering video with effects...';
+                document.getElementById('currentStep').textContent = 'Starting video render (this may take 10-30 minutes for long videos)...';
 
                 const imageInterval = Math.floor(state.audioDuration / state.generatedImages.length);
 
-                const videoResponse = await fetch(`${API_BASE_URL}/api/create-video`, {
+                console.log('🚀 Starting ASYNC video generation...');
+
+                // Start async video generation
+                const startResponse = await fetch(`${API_BASE_URL}/api/create-video-async`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1277,28 +1280,78 @@
                     })
                 });
 
-                if (!videoResponse.ok) throw new Error('Video rendering failed');
-                const videoData = await videoResponse.json();
+                if (!startResponse.ok) throw new Error('Failed to start video generation');
+                const startData = await startResponse.json();
+                const jobId = startData.jobId;
 
-                updateStepStatus('video', 'complete');
-                document.getElementById('overallProgressBar').style.width = '100%';
-                document.getElementById('overallProgress').textContent = '100%';
-                document.getElementById('currentStep').textContent = 'Complete! Opening video...';
+                console.log(`✅ Job started: ${jobId}`);
+                document.getElementById('currentStep').textContent = `Rendering in background... (Job: ${jobId.substr(0, 12)}...)`;
 
-                // Open video in new window AND download
-                window.open(videoData.videoUrl, '_blank');
+                // Poll for job status every 5 seconds
+                let jobCompleted = false;
+                let pollAttempts = 0;
+                const maxPollAttempts = 360; // 30 minutes max (360 * 5 seconds)
 
-                // Also trigger download
-                const link = document.createElement('a');
-                link.href = videoData.videoUrl;
-                link.download = `${state.videoTitle.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-battletech-horror.mp4`;
-                link.click();
+                while (!jobCompleted && pollAttempts < maxPollAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+                    pollAttempts++;
 
-                // Show success
-                setTimeout(() => {
-                    progressSection.classList.add('hidden');
-                    successSection.classList.remove('hidden');
-                }, 1000);
+                    console.log(`🔄 Polling job status (attempt ${pollAttempts})...`);
+
+                    const statusResponse = await fetch(`${API_BASE_URL}/api/job-status/${jobId}`);
+
+                    if (!statusResponse.ok) {
+                        console.error('Failed to check job status');
+                        continue;
+                    }
+
+                    const statusData = await statusResponse.json();
+                    const job = statusData.job;
+
+                    console.log(`📊 Job status: ${job.status}, progress: ${job.progress}%`);
+
+                    // Update UI with job progress
+                    const overallProgress = 70 + Math.round(job.progress * 0.3); // Map 0-100% job progress to 70-100% overall
+                    document.getElementById('overallProgressBar').style.width = `${overallProgress}%`;
+                    document.getElementById('overallProgress').textContent = `${overallProgress}%`;
+                    document.getElementById('currentStep').textContent = `Rendering video... ${job.progress}% (${Math.round(pollAttempts * 5 / 60)} min elapsed)`;
+
+                    if (job.status === 'completed') {
+                        jobCompleted = true;
+                        console.log('✅ Job completed!');
+
+                        updateStepStatus('video', 'complete');
+                        document.getElementById('overallProgressBar').style.width = '100%';
+                        document.getElementById('overallProgress').textContent = '100%';
+                        document.getElementById('currentStep').textContent = 'Complete! Opening video...';
+
+                        // Build full video URL
+                        const videoUrl = `${API_BASE_URL}${job.videoUrl}`;
+
+                        // Open video in new window AND download
+                        window.open(videoUrl, '_blank');
+
+                        // Also trigger download
+                        const link = document.createElement('a');
+                        link.href = videoUrl;
+                        link.download = `${state.videoTitle.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-battletech-horror.mp4`;
+                        link.click();
+
+                        // Show success
+                        setTimeout(() => {
+                            progressSection.classList.add('hidden');
+                            successSection.classList.remove('hidden');
+                        }, 1000);
+
+                    } else if (job.status === 'failed') {
+                        throw new Error(`Video generation failed: ${job.error}`);
+                    }
+                    // If status is 'queued' or 'processing', keep polling
+                }
+
+                if (!jobCompleted) {
+                    throw new Error('Video generation timed out after 30 minutes. Please try with shorter audio.');
+                }
 
             } catch (error) {
                 showError(`Error: ${error.message}`);
