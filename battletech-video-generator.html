@@ -525,7 +525,7 @@
             audioDuration: 0,
             audioMode: 'generate', // 'generate' or 'upload'
             uploadedAudioFile: null,
-            imageProvider: 'fal' // Switch back to Fal.ai - user can add $5-10 credit
+            imageProvider: 'pollinations' // FREE - no API key needed!
         };
 
         // DOM Elements
@@ -601,8 +601,8 @@
         // Check provider availability on page load
         checkProviderAvailability();
 
-        // Track selected image provider (default: fal)
-        let selectedImageProvider = 'fal';
+        // Track selected image provider (default: pollinations - FREE!)
+        let selectedImageProvider = 'pollinations';
 
         // Add click handlers for provider selection
         providerFal.addEventListener('click', () => {

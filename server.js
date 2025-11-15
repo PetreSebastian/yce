@@ -334,7 +334,7 @@ app.get('/health', (req, res) => {
 app.get('/api/providers-status', (req, res) => {
   res.json({
     pollinations: true, // Always available (free, no key needed)
-    gemini: GEMINI_API_KEY && GEMINI_API_KEY.length > 0,
+    gemini: false, // Disabled - Gemini API key only works for text, not images
     fal: FAL_API_KEY && FAL_API_KEY.length > 0,
     stability: STABILITY_API_KEY && STABILITY_API_KEY.length > 0
   });
@@ -650,7 +650,7 @@ app.post('/api/generate-voiceover', async (req, res) => {
     console.log(`📝 Text length: ${text.length} characters`);
 
     // Truncate text if too large to avoid payload errors
-    const maxTextLength = 4000; // 4k characters max for TTS
+    const maxTextLength = 30000; // 30k characters max for TTS (~6000 words, ~10-15 min audio)
     let processedText = text;
 
     if (text.length > maxTextLength) {
