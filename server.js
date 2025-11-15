@@ -1485,14 +1485,14 @@ app.post('/api/create-video', async (req, res) => {
       let filter = '';
 
       if (effect === 'zoomIn') {
-        // PERFECTLY CENTERED - crop to exact 1920x1080, no black bars!
-        filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='if(lte(on,${midFrame}),1.0+0.25*on/${midFrame},1.25-0.25*(on-${midFrame})/${midFrame})':x=iw/2-(iw/zoom)/2:y=ih/2-(ih/zoom)/2:d=${totalFrames}:s=1920x1080:fps=24`;
+        // SUBTLE ZOOM - 1.0 to 1.03x (3% zoom - professional look!)
+        filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='if(lte(on,${midFrame}),1.0+0.03*on/${midFrame},1.03-0.03*(on-${midFrame})/${midFrame})':x=iw/2-(iw/zoom)/2:y=ih/2-(ih/zoom)/2:d=${totalFrames}:s=1920x1080:fps=20`;
       } else {
-        // Alternative: 1.25 → 1.0 → 1.25
-        filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='if(lte(on,${midFrame}),1.25-0.25*on/${midFrame},1.0+0.25*(on-${midFrame})/${midFrame})':x=iw/2-(iw/zoom)/2:y=ih/2-(ih/zoom)/2:d=${totalFrames}:s=1920x1080:fps=24`;
+        // SUBTLE ZOOM OUT - 1.03 to 1.0x (3% zoom - professional look!)
+        filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='if(lte(on,${midFrame}),1.03-0.03*on/${midFrame},1.0+0.03*(on-${midFrame})/${midFrame})':x=iw/2-(iw/zoom)/2:y=ih/2-(ih/zoom)/2:d=${totalFrames}:s=1920x1080:fps=20`;
       }
 
-      // Create segment with effect - VERYFAST preset for speed
+      // Create segment with effect - ULTRAFAST for SPEED!
       await new Promise((resolve, reject) => {
         const ffmpeg = spawn('ffmpeg', [
           '-loop', '1',
@@ -1500,7 +1500,7 @@ app.post('/api/create-video', async (req, res) => {
           '-vf', filter,
           '-t', adjustedInterval.toString(),
           '-c:v', 'libx264',
-          '-preset', 'veryfast', // Even faster than ultrafast but better quality
+          '-preset', 'ultrafast', // MUCH faster encoding!
           '-crf', '28', // Slightly lower quality for speed
           '-pix_fmt', 'yuv420p',
           '-y',
@@ -1924,12 +1924,14 @@ async function processVideoJob(jobId) {
     let filter = '';
 
     if (effect === 'zoomIn') {
-      filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='if(lte(on,${midFrame}),1.0+0.25*on/${midFrame},1.25-0.25*(on-${midFrame})/${midFrame})':x=iw/2-(iw/zoom)/2:y=ih/2-(ih/zoom)/2:d=${totalFrames}:s=1920x1080:fps=24`;
+      // SUBTLE ZOOM - 1.0 to 1.03x (3% zoom - professional look!)
+      filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='if(lte(on,${midFrame}),1.0+0.03*on/${midFrame},1.03-0.03*(on-${midFrame})/${midFrame})':x=iw/2-(iw/zoom)/2:y=ih/2-(ih/zoom)/2:d=${totalFrames}:s=1920x1080:fps=20`;
     } else {
-      filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='if(lte(on,${midFrame}),1.25-0.25*on/${midFrame},1.0+0.25*(on-${midFrame})/${midFrame})':x=iw/2-(iw/zoom)/2:y=ih/2-(ih/zoom)/2:d=${totalFrames}:s=1920x1080:fps=24`;
+      // SUBTLE ZOOM OUT - 1.03 to 1.0x (3% zoom - professional look!)
+      filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='if(lte(on,${midFrame}),1.03-0.03*on/${midFrame},1.0+0.03*(on-${midFrame})/${midFrame})':x=iw/2-(iw/zoom)/2:y=ih/2-(ih/zoom)/2:d=${totalFrames}:s=1920x1080:fps=20`;
     }
 
-    // Create segment with effect
+    // Create segment with effect - ULTRAFAST for SPEED!
     await new Promise((resolve, reject) => {
       const ffmpeg = spawn('ffmpeg', [
         '-loop', '1',
@@ -1937,7 +1939,7 @@ async function processVideoJob(jobId) {
         '-vf', filter,
         '-t', adjustedInterval.toString(),
         '-c:v', 'libx264',
-        '-preset', 'veryfast',
+        '-preset', 'ultrafast', // MUCH faster encoding!
         '-crf', '28',
         '-pix_fmt', 'yuv420p',
         '-y',
