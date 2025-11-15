@@ -549,9 +549,21 @@ Write ONLY the story text. Target: ${targetWords} words (±500). Make it complet
     }
 
     let generatedScript = groqData.choices[0].message.content;
+    const finishReason = groqData.choices[0].finish_reason;
     let actualWords = generatedScript.split(/\s+/).length;
     const minWords = targetWords - 500; // Target ±500 words accuracy
     const maxWords = targetWords + 500;
+
+    // DEBUG: Log generation results
+    console.log(`📊 Initial generation: ${actualWords} words`);
+    console.log(`🏁 Finish reason: ${finishReason}`);
+    console.log(`📈 Tokens used: ${groqData.usage?.completion_tokens || 'unknown'}/${Math.floor(targetWords * 3.5)}`);
+
+    if (finishReason === 'length') {
+      console.log('⚠️ Generation truncated by max_tokens limit - will continue...');
+    } else if (finishReason === 'stop' && actualWords < minWords) {
+      console.log(`⚠️ Model stopped early (only ${actualWords}/${minWords} words) - will force continuation...`);
+    }
 
     // MULTI-SHOT GENERATION: Continue if story is too short
     let attempts = 0;
@@ -559,9 +571,9 @@ Write ONLY the story text. Target: ${targetWords} words (±500). Make it complet
 
     while (actualWords < minWords && attempts < maxAttempts) {
       const wordsNeeded = minWords - actualWords;
-      console.log(`📝 Story too short (${actualWords} words, need ${minWords}). Adding ${wordsNeeded} more words... (attempt ${attempts + 1}/${maxAttempts})`);
+      console.log(`📝 Story too short (${actualWords} words, need ${minWords}). Adding ~${wordsNeeded} more words... (attempt ${attempts + 1}/${maxAttempts})`);
 
-      // Continue the story with a continuation prompt
+      // Continue the story using FULL conversation history for better context
       const continueResponse = await fetch(GROQ_API_URL, {
         method: 'POST',
         headers: {
@@ -573,15 +585,23 @@ Write ONLY the story text. Target: ${targetWords} words (±500). Make it complet
           messages: [
             {
               role: 'system',
-              content: `You are a professional BattleTech horror writer. Continue this story with EXACTLY ${wordsNeeded} more words. Make it atmospheric and visual. Hit the exact word count.`
+              content: systemPrompt // Reuse original system prompt for consistency
             },
             {
               role: 'user',
-              content: `Continue this story with ${wordsNeeded} more words:\n\n${generatedScript.slice(-1500)}\n\n[Continue the story naturally with ${wordsNeeded} more words]`
+              content: userPrompt // Reuse original instructions
+            },
+            {
+              role: 'assistant',
+              content: generatedScript // Show what was already written (full context!)
+            },
+            {
+              role: 'user',
+              content: `This story is currently ${actualWords} words, but needs to be ${minWords}-${maxWords} words. Continue the story with approximately ${wordsNeeded} more words. DO NOT summarize or conclude hastily - keep building the narrative with more scenes, atmospheric details, and character development. The story should feel complete only when it reaches the target length.`
             }
           ],
           temperature: 0.8,
-          max_tokens: Math.floor(wordsNeeded * 1.8), // More tokens to ensure full generation
+          max_tokens: Math.floor(wordsNeeded * 3.0), // Increased from 1.8 to 3.0 for safety
           top_p: 0.9,
           stream: false
         })
@@ -591,10 +611,21 @@ Write ONLY the story text. Target: ${targetWords} words (±500). Make it complet
         const continueData = await continueResponse.json();
         if (continueData.choices && continueData.choices.length > 0) {
           const continuation = continueData.choices[0].message.content;
-          generatedScript += continuation;
+          const continueFinishReason = continueData.choices[0].finish_reason;
+          const continueTokens = continueData.usage?.completion_tokens || 0;
+          const continuationWords = continuation.split(/\s+/).length;
+
+          generatedScript += '\n\n' + continuation; // Add spacing between sections
           actualWords = generatedScript.split(/\s+/).length;
-          console.log(`📝 Continued story: now ${actualWords} words`);
+
+          console.log(`✅ Added ${continuationWords} words (finish: ${continueFinishReason}, tokens: ${continueTokens})`);
+          console.log(`📝 Total now: ${actualWords} words`);
+        } else {
+          console.error('⚠️ Continuation returned no content!');
         }
+      } else {
+        const errorText = await continueResponse.text();
+        console.error(`❌ Continuation API call failed: ${continueResponse.status} - ${errorText}`);
       }
 
       attempts++;
