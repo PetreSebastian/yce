@@ -477,17 +477,17 @@ app.post('/api/generate-script', async (req, res) => {
 
 Your writing style matches the requested length - you write complete, well-paced stories that hit the target word count without being padded or rushed. You build rich atmospheric worlds through descriptions, dialogue, and character development.`;
 
-    const userPrompt = `You MUST write a complete BattleTech horror story with these specifications:
+    const userPrompt = `Write a complete BattleTech horror story with these specifications:
 
 **Title:** "${title}"
-**Target Length:** ${targetWords} words (aim for ${Math.floor(targetWords * 0.85)}-${Math.floor(targetWords * 1.1)} words)
+**Target Length:** EXACTLY ${targetWords} words (acceptable range: ${targetWords - 500} to ${targetWords + 500} words)
 
-**LENGTH REQUIREMENTS:**
-- Aim for approximately ${targetWords} words
-- Write a complete, well-paced story (not rushed, not overly padded)
-- Expand scenes naturally with good dialogue and descriptions
-- Include character development and atmospheric details
-- Ensure the story feels complete and satisfying
+**CRITICAL LENGTH REQUIREMENT:**
+- You MUST write between ${targetWords - 500} and ${targetWords + 500} words
+- Aim for exactly ${targetWords} words - this is very important
+- Write a complete, well-paced story that hits this word count
+- Expand or condense scenes as needed to hit the target
+- Do NOT stop early, do NOT write excessively long
 
 **REQUIRED CONTENT:**
 • First-person perspective from a MechWarrior or technician
@@ -508,7 +508,7 @@ Include specific BattleMech models, technical components, industrial environment
 
 ${instructions ? `**ADDITIONAL GUIDELINES:** ${instructions.substring(0, 1000)}` : ''}
 
-Write ONLY the story text. Aim for approximately ${targetWords} words - write a complete, satisfying story.`;
+Write ONLY the story text. Target: ${targetWords} words (±500). Make it complete and satisfying. Hit the word count target.`;
 
     // Call Groq API
     const groqResponse = await fetch(GROQ_API_URL, {
@@ -550,14 +550,16 @@ Write ONLY the story text. Aim for approximately ${targetWords} words - write a 
 
     let generatedScript = groqData.choices[0].message.content;
     let actualWords = generatedScript.split(/\s+/).length;
-    const minWords = Math.floor(targetWords * 0.85); // 85% of target (no hardcoded minimum!)
+    const minWords = targetWords - 500; // Target ±500 words accuracy
+    const maxWords = targetWords + 500;
 
-    // MULTI-SHOT GENERATION: Continue if story is too short or incomplete
+    // MULTI-SHOT GENERATION: Continue if story is too short
     let attempts = 0;
-    const maxAttempts = 2; // Reduced to avoid gigantic scripts
+    const maxAttempts = 3; // Increased to ensure we hit target
 
     while (actualWords < minWords && attempts < maxAttempts) {
-      console.log(`📝 Story too short (${actualWords} words, need ${minWords}). Continuing generation... (attempt ${attempts + 1}/${maxAttempts})`);
+      const wordsNeeded = minWords - actualWords;
+      console.log(`📝 Story too short (${actualWords} words, need ${minWords}). Adding ${wordsNeeded} more words... (attempt ${attempts + 1}/${maxAttempts})`);
 
       // Continue the story with a continuation prompt
       const continueResponse = await fetch(GROQ_API_URL, {
@@ -571,15 +573,15 @@ Write ONLY the story text. Aim for approximately ${targetWords} words - write a 
           messages: [
             {
               role: 'system',
-              content: `You are completing a BattleTech horror story. Write exactly ${Math.min(2000, minWords - actualWords)} words to finish this story properly with a satisfying conclusion. DO NOT write more than ${Math.min(2000, minWords - actualWords)} words.`
+              content: `You are a professional BattleTech horror writer. Continue this story with EXACTLY ${wordsNeeded} more words. Make it atmospheric and visual. Hit the exact word count.`
             },
             {
               role: 'user',
-              content: `Complete this BattleTech horror story. Current story:\n\n${generatedScript.slice(-1000)}\n\nWrite exactly ${Math.min(2000, minWords - actualWords)} words to conclude this story. Provide a complete, satisfying ending.`
+              content: `Continue this story with ${wordsNeeded} more words:\n\n${generatedScript.slice(-1500)}\n\n[Continue the story naturally with ${wordsNeeded} more words]`
             }
           ],
           temperature: 0.8,
-          max_tokens: Math.min(3000, Math.floor((minWords - actualWords) * 1.5)), // Cap tokens
+          max_tokens: Math.floor(wordsNeeded * 1.8), // More tokens to ensure full generation
           top_p: 0.9,
           stream: false
         })
@@ -607,6 +609,16 @@ Write ONLY the story text. Aim for approximately ${targetWords} words - write a 
     }
 
     console.log(`✅ Script generated: ${generatedScript.length} characters, ~${actualWords} words`);
+    console.log(`🎯 Target: ${targetWords} words (range: ${minWords}-${maxWords})`);
+
+    if (actualWords < minWords) {
+      console.log(`⚠️ WARNING: Story is ${minWords - actualWords} words SHORT of target!`);
+    } else if (actualWords > maxWords) {
+      console.log(`⚠️ WARNING: Story is ${actualWords - maxWords} words OVER target!`);
+    } else {
+      console.log(`✅ Word count within acceptable range!`);
+    }
+
     console.log(`🚀 Generated in ${groqData.usage?.total_time || 'unknown'} time`);
 
     res.json({
