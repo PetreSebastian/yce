@@ -26,6 +26,9 @@ if (!fs.existsSync(tempDir)) {
 // Serve static files from temp directory
 app.use('/temp', express.static(tempDir));
 
+// Serve static files (HTML frontend)
+app.use(express.static(__dirname));
+
 // Load environment variables
 require('dotenv').config();
 
