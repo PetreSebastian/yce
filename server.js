@@ -511,7 +511,7 @@ app.post('/api/generate-script', async (req, res) => {
     // SECTION 1: Opening
     console.log(`\n📖 Section 1/${numSections} - Opening (${wordsPerSection} words)...`);
 
-    const section1Prompt = `Write the OPENING of a BattleTech horror story titled "${title}".
+    const section1Prompt = `Write the OPENING of a BattleTech horror story about: ${title}
 
 Write EXACTLY ${wordsPerSection} words.
 
@@ -519,8 +519,9 @@ Write EXACTLY ${wordsPerSection} words.
 - EC Comics horror style
 - Introduce setting, character, situation
 - Visual, atmospheric descriptions
+- Do NOT include the title in the story text
 
-${wordsPerSection} words. Start:`;
+${wordsPerSection} words. Start directly with the story:`;
 
     let resp1 = await fetchWithRetry(GROQ_API_URL, {
       method: 'POST',
