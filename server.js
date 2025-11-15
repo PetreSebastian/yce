@@ -530,7 +530,7 @@ Write ONLY the story text. Target: ${targetWords} words (±500). Make it complet
           }
         ],
         temperature: 0.8,
-        max_tokens: Math.floor(targetWords * 3.5), // Much more tokens to ensure full generation
+        max_tokens: Math.floor(targetWords * 1.6), // Conservative: ~1.3-1.5 tokens per word
         top_p: 0.9,
         stream: false
       })
