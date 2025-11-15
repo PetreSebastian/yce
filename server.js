@@ -1669,12 +1669,12 @@ app.post('/api/create-video', async (req, res) => {
       let filter = '';
 
       if (effect === 'zoomIn') {
-        // ZOOM IN first half, ZOOM OUT second half - ROCK SOLID CENTER, NO MOVEMENT!
-        // First scale/crop to exact size, THEN apply zoom centered at 960,540 (center of 1920x1080)
-        filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080:(iw-1920)/2:(ih-1080)/2,zoompan=z='if(lte(on,${midFrame}),1.0+0.03*on/${midFrame},1.03-0.03*(on-${midFrame})/${midFrame})':x=960:y=540:d=${totalFrames}:s=1920x1080:fps=${FPS},noise=alls=30:allf=t+u`;
+        // WOBBLE-PROOF ZOOM IN/OUT - floor() prevents sub-pixel jitter
+        // Always anchored to EXACT center, only scale changes, position NEVER changes
+        filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080:(iw-1920)/2:(ih-1080)/2,zoompan=z='if(lte(on,${midFrame}),1.0+0.03*on/${midFrame},1.03-0.03*(on-${midFrame})/${midFrame})':x='floor((iw-iw/zoom)/2)':y='floor((ih-ih/zoom)/2)':d=${totalFrames}:s=1920x1080:fps=${FPS},noise=alls=30:allf=t+u`;
       } else {
-        // ZOOM OUT first half, ZOOM IN second half - ROCK SOLID CENTER, NO MOVEMENT!
-        filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080:(iw-1920)/2:(ih-1080)/2,zoompan=z='if(lte(on,${midFrame}),1.03-0.03*on/${midFrame},1.0+0.03*(on-${midFrame})/${midFrame})':x=960:y=540:d=${totalFrames}:s=1920x1080:fps=${FPS},noise=alls=30:allf=t+u`;
+        // WOBBLE-PROOF ZOOM OUT/IN - floor() prevents sub-pixel jitter
+        filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080:(iw-1920)/2:(ih-1080)/2,zoompan=z='if(lte(on,${midFrame}),1.03-0.03*on/${midFrame},1.0+0.03*(on-${midFrame})/${midFrame})':x='floor((iw-iw/zoom)/2)':y='floor((ih-ih/zoom)/2)':d=${totalFrames}:s=1920x1080:fps=${FPS},noise=alls=30:allf=t+u`;
       }
 
       // Create segment with effect - ULTRAFAST for SPEED!
