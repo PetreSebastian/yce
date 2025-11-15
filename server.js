@@ -1688,14 +1688,9 @@ app.post('/api/create-video', async (req, res) => {
 
       let filter = '';
 
-      if (effect === 'zoomIn') {
-        // WOBBLE-PROOF ZOOM IN/OUT - floor() prevents sub-pixel jitter
-        // Always anchored to EXACT center, only scale changes, position NEVER changes
-        filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080:(iw-1920)/2:(ih-1080)/2,zoompan=z='if(lte(on,${midFrame}),1.0+0.03*on/${midFrame},1.03-0.03*(on-${midFrame})/${midFrame})':x='floor((iw-iw/zoom)/2)':y='floor((ih-ih/zoom)/2)':d=${totalFrames}:s=1920x1080:fps=${FPS},noise=alls=30:allf=t+u`;
-      } else {
-        // WOBBLE-PROOF ZOOM OUT/IN - floor() prevents sub-pixel jitter
-        filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080:(iw-1920)/2:(ih-1080)/2,zoompan=z='if(lte(on,${midFrame}),1.03-0.03*on/${midFrame},1.0+0.03*(on-${midFrame})/${midFrame})':x='floor((iw-iw/zoom)/2)':y='floor((ih-ih/zoom)/2)':d=${totalFrames}:s=1920x1080:fps=${FPS},noise=alls=30:allf=t+u`;
-      }
+      // SMOOTH ZOOM IN/OUT with sine wave - NO MOVEMENT, ONLY ZOOM + VISIBLE PARTICLES
+      // floor() prevents sub-pixel jitter, sine creates smooth breathing effect
+      filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080:(iw-1920)/2:(ih-1080)/2,zoompan=z='1+0.03*sin(2*PI*on/${totalFrames})':x='floor((iw-iw/zoom)/2)':y='floor((ih-ih/zoom)/2)':d=${totalFrames}:s=1920x1080:fps=${FPS},noise=alls=80:allf=t+u`;
 
       // Create segment with effect - ULTRAFAST for SPEED!
       await new Promise((resolve, reject) => {
@@ -1770,7 +1765,7 @@ app.post('/api/create-video', async (req, res) => {
         '-i', videoOnlyPath,
         '-i', audioPath,
         '-filter_complex',
-        `[0:v]noise=alls=40:allf=t+u,eq=brightness=0.02:contrast=1.08:saturation=0.90[vout]`,
+        `[0:v]noise=alls=100:allf=t+u,eq=brightness=0.02:contrast=1.10:saturation=0.88[vout]`,
         '-map', '[vout]',
         '-map', '1:a',
         '-c:v', 'libx264',
