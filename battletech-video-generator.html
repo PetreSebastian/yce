@@ -477,7 +477,7 @@
                             <span class="text-xl">⏸️</span> <span>Generate voiceover</span>
                         </div>
                         <div id="step-video" class="flex items-center gap-2 text-gray-400">
-                            <span class="text-xl">⏸️</span> <span>Render video with effects</span>
+                            <span class="text-xl">⏸️</span> <span>Render video with effects <span id="videoProgress" class="text-yellow-400 font-mono"></span></span>
                         </div>
                     </div>
 
@@ -1287,6 +1287,12 @@
                 console.log(`✅ Job started: ${jobId}`);
                 document.getElementById('currentStep').textContent = `Rendering in background... (Job: ${jobId.substr(0, 12)}...)`;
 
+                // Show initial status in video step
+                const videoProgressEl = document.getElementById('videoProgress');
+                if (videoProgressEl) {
+                    videoProgressEl.textContent = `- ⏳ Starting... [0s]`;
+                }
+
                 // Poll for job status every 5 seconds
                 let jobCompleted = false;
                 let pollAttempts = 0;
@@ -1310,11 +1316,26 @@
 
                     console.log(`📊 Job status: ${job.status}, progress: ${job.progress}%`);
 
+                    // Calculate elapsed time
+                    const elapsedSeconds = pollAttempts * 5;
+                    const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+                    const remainingSeconds = elapsedSeconds % 60;
+                    const timeStr = elapsedMinutes > 0
+                        ? `${elapsedMinutes}m ${remainingSeconds}s`
+                        : `${remainingSeconds}s`;
+
                     // Update UI with job progress
                     const overallProgress = 70 + Math.round(job.progress * 0.3); // Map 0-100% job progress to 70-100% overall
                     document.getElementById('overallProgressBar').style.width = `${overallProgress}%`;
                     document.getElementById('overallProgress').textContent = `${overallProgress}%`;
-                    document.getElementById('currentStep').textContent = `Rendering video... ${job.progress}% (${Math.round(pollAttempts * 5 / 60)} min elapsed)`;
+                    document.getElementById('currentStep').textContent = `Rendering video... ${job.progress}% (${timeStr} elapsed)`;
+
+                    // Update video step with live progress indicator
+                    const videoProgressEl = document.getElementById('videoProgress');
+                    if (videoProgressEl) {
+                        const spinner = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'][pollAttempts % 10];
+                        videoProgressEl.textContent = `- ${spinner} ${job.progress}% [${timeStr}]`;
+                    }
 
                     if (job.status === 'completed') {
                         jobCompleted = true;
@@ -1324,6 +1345,12 @@
                         document.getElementById('overallProgressBar').style.width = '100%';
                         document.getElementById('overallProgress').textContent = '100%';
                         document.getElementById('currentStep').textContent = 'Complete! Opening video...';
+
+                        // Clear progress indicator
+                        const videoProgressEl = document.getElementById('videoProgress');
+                        if (videoProgressEl) {
+                            videoProgressEl.textContent = '';
+                        }
 
                         // Build full video URL
                         const videoUrl = `${API_BASE_URL}${job.videoUrl}`;
