@@ -835,15 +835,15 @@ app.post('/api/generate/gemini', async (req, res) => {
         // DEBUG: Log the full response to understand structure
         console.log(`🔍 DEBUG - Gemini response for image ${i + 1}:`, JSON.stringify(data, null, 2));
 
-        // Gemini 2.5 returns image in candidates[0].content.parts[].inline_data
+        // Gemini 2.5 returns image in candidates[0].content.parts[].inlineData (camelCase!)
         let imageBase64 = null;
         if (data.candidates && data.candidates[0]?.content?.parts) {
           console.log(`📦 Found ${data.candidates[0].content.parts.length} parts in response`);
           for (const part of data.candidates[0].content.parts) {
             console.log(`🔧 Part type:`, Object.keys(part));
-            if (part.inline_data && part.inline_data.mime_type?.startsWith('image/')) {
-              imageBase64 = part.inline_data.data;
-              console.log(`✅ Found image! MIME type: ${part.inline_data.mime_type}, Data length: ${imageBase64?.length || 0}`);
+            if (part.inlineData && part.inlineData.mimeType?.startsWith('image/')) {
+              imageBase64 = part.inlineData.data;
+              console.log(`✅ Found image! MIME type: ${part.inlineData.mimeType}, Data length: ${imageBase64?.length || 0}`);
               break;
             }
           }
