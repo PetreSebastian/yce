@@ -507,6 +507,12 @@ ${wordsPerSection} words. Start:`;
     totalWords = generatedScript.split(/\s+/).length;
     console.log(`✅ Section 1: ${totalWords} words`);
 
+    // Wait 2 seconds to respect rate limits (12k tokens/minute)
+    if (numSections > 1) {
+      console.log('⏱️ Waiting 2s to respect rate limits...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+
     // MIDDLE SECTIONS 2 to N-1
     for (let i = 2; i < numSections; i++) {
       console.log(`\n📖 Section ${i}/${numSections} - Continuing (${wordsPerSection} words)...`);
@@ -541,6 +547,12 @@ Add ${wordsPerSection} words. Build tension. Do NOT conclude.`;
         generatedScript += '\n\n' + cont;
         totalWords = generatedScript.split(/\s+/).length;
         console.log(`✅ Section ${i}: +${cont.split(/\s+/).length} words (Total: ${totalWords})`);
+
+        // Wait 2 seconds before next section to respect rate limits
+        if (i < numSections - 1) {
+          console.log('⏱️ Waiting 2s to respect rate limits...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
       } else {
         const errorText = await respN.text();
         console.error(`❌ Section ${i} FAILED: ${respN.status} - ${errorText}`);
@@ -550,6 +562,10 @@ Add ${wordsPerSection} words. Build tension. Do NOT conclude.`;
 
     // FINAL SECTION: Conclusion
     if (numSections > 1) {
+      // Wait 2 seconds before final section to respect rate limits
+      console.log('⏱️ Waiting 2s to respect rate limits...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
       console.log(`\n📖 Section ${numSections}/${numSections} - CONCLUSION (${lastSectionWords} words)...`);
 
       const finalPrompt = `END the story with EXACTLY ${lastSectionWords} more words.
