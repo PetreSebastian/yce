@@ -91,17 +91,30 @@ if (!fs.existsSync(jobsDir)) {
 function loadJobsFromDisk() {
   try {
     const files = fs.readdirSync(jobsDir);
+    let orphanedCount = 0;
+
     for (const file of files) {
       if (file.endsWith('.json')) {
         const jobPath = path.join(jobsDir, file);
         const jobMetadata = JSON.parse(fs.readFileSync(jobPath, 'utf8'));
         jobMetadata.createdAt = new Date(jobMetadata.createdAt); // Convert back to Date
         jobMetadata.data = null; // Data was not persisted, set to null
+
+        // Mark orphaned processing jobs as failed (server restarted mid-processing)
+        if (jobMetadata.status === 'processing' || jobMetadata.status === 'queued') {
+          jobMetadata.status = 'failed';
+          jobMetadata.error = 'Server restarted while job was processing. Please try again.';
+          orphanedCount++;
+          console.log(`⚠️ Marked orphaned job as failed: ${jobMetadata.id}`);
+          // Save the updated status back to disk
+          fs.writeFileSync(jobPath, JSON.stringify(jobMetadata, null, 2));
+        }
+
         jobs.set(jobMetadata.id, jobMetadata);
         console.log(`📂 Loaded job metadata from disk: ${jobMetadata.id} (status: ${jobMetadata.status})`);
       }
     }
-    console.log(`✅ Loaded ${jobs.size} jobs from disk`);
+    console.log(`✅ Loaded ${jobs.size} jobs from disk (${orphanedCount} orphaned jobs marked as failed)`);
   } catch (error) {
     console.error('⚠️ Error loading jobs from disk:', error.message);
   }
