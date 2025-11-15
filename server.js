@@ -446,6 +446,94 @@ Generate exactly ${targetCount} prompts following this format:`;
   }
 });
 
+// Generate video description and tags from script
+app.post('/api/generate-description', async (req, res) => {
+  console.log('\n📋 Video description generation request received...');
+
+  try {
+    const { script, title } = req.body;
+
+    if (!script || !script.trim()) {
+      return res.status(400).json({ error: 'Script is required' });
+    }
+
+    console.log(`🔍 Generating description and tags for: "${title || 'Untitled'}"`);
+
+    // Use first 3000 chars to avoid payload issues
+    const truncatedScript = script.length > 3000 ? script.substring(0, 3000) + '...' : script;
+
+    const systemPrompt = `You are a YouTube SEO expert specializing in BattleTech and horror content. You create engaging descriptions and effective tags.`;
+
+    const userPrompt = `Based on this BattleTech horror script, generate a YouTube description and tags.
+
+TITLE: ${title || 'BattleTech Horror Story'}
+
+SCRIPT EXCERPT:
+${truncatedScript}
+
+Generate:
+
+1. DESCRIPTION (3-4 sentences): Engaging description that hooks viewers and explains what they'll experience. Include BattleTech lore references.
+
+2. TAGS (15-20 tags): Comma-separated tags for YouTube SEO. Include: BattleTech, MechWarrior, horror, sci-fi, specific mech names if mentioned, mood keywords.
+
+FORMAT:
+DESCRIPTION:
+[Your description here]
+
+TAGS:
+[tag1, tag2, tag3, etc]`;
+
+    // Call Groq API
+    const response = await fetchWithRetry(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 500,
+        stream: false
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Groq API failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const generated = data.choices[0].message.content;
+
+    // Parse description and tags
+    const descMatch = generated.match(/DESCRIPTION:\s*\n(.+?)(?=\n\nTAGS:|$)/s);
+    const tagsMatch = generated.match(/TAGS:\s*\n(.+)/s);
+
+    const description = descMatch ? descMatch[1].trim() : generated;
+    const tags = tagsMatch ? tagsMatch[1].trim() : 'BattleTech, MechWarrior, horror, sci-fi';
+
+    console.log('✅ Description and tags generated successfully');
+
+    res.json({
+      success: true,
+      description: description,
+      tags: tags
+    });
+
+  } catch (error) {
+    console.error('❌ Description generation error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Helper function to retry API calls with exponential backoff on rate limits
 async function fetchWithRetry(url, options, maxRetries = 4) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {

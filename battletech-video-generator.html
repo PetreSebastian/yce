@@ -133,6 +133,45 @@
                 </div>
             </div>
 
+            <!-- Step 2.5: Video Description & Tags (Auto-Generated) -->
+            <div id="descriptionSection" class="hidden bg-gray-800 border-2 border-blue-700 p-6 rounded-lg mb-6">
+                <h2 class="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                    📋 Video Description & Tags (Auto-Generated)
+                </h2>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-white font-semibold mb-2">
+                            📝 YouTube Description:
+                        </label>
+                        <textarea
+                            id="videoDescription"
+                            class="w-full px-4 py-3 bg-gray-700 text-white rounded-lg border-2 border-gray-600 focus:border-blue-600 focus:outline-none h-32 resize-y text-sm"
+                            placeholder="Generating description..."
+                        ></textarea>
+                        <p class="text-gray-400 text-xs mt-1">Auto-generated from script. Edit if needed.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-white font-semibold mb-2">
+                            🏷️ YouTube Tags:
+                        </label>
+                        <textarea
+                            id="videoTags"
+                            class="w-full px-4 py-3 bg-gray-700 text-white rounded-lg border-2 border-gray-600 focus:border-blue-600 focus:outline-none h-20 resize-y text-sm"
+                            placeholder="Generating tags..."
+                        ></textarea>
+                        <p class="text-gray-400 text-xs mt-1">Comma-separated tags for YouTube/social media.</p>
+                    </div>
+
+                    <div class="bg-blue-900/20 border border-blue-600 rounded-lg p-3">
+                        <p class="text-blue-200 text-sm">
+                            💡 <strong>Tip:</strong> These are auto-generated based on your script. Copy them to use when uploading to YouTube!
+                        </p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Step 3: Configuration -->
             <div id="step3" class="bg-gray-800 border-2 border-gray-700 p-6 rounded-lg mb-6">
                 <h2 class="text-2xl font-bold text-white mb-4 flex items-center gap-2">
@@ -543,6 +582,9 @@
         const successSection = document.getElementById('successSection');
         const errorBox = document.getElementById('errorBox');
         const newVideoBtn = document.getElementById('newVideoBtn');
+        const descriptionSection = document.getElementById('descriptionSection');
+        const videoDescription = document.getElementById('videoDescription');
+        const videoTags = document.getElementById('videoTags');
 
         // Thumbnail button
         const generateThumbnailBtn = document.getElementById('generateThumbnailBtn');
@@ -855,6 +897,38 @@
             }
         }
 
+        // Auto-generate video description and tags from script
+        async function generateDescriptionAndTags(script, title) {
+            try {
+                console.log('📋 Auto-generating description and tags...');
+
+                videoDescription.value = 'Generating description...';
+                videoTags.value = 'Generating tags...';
+                descriptionSection.classList.remove('hidden');
+
+                const response = await fetch(`${API_BASE_URL}/api/generate-description`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ script, title })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to generate description');
+                }
+
+                const data = await response.json();
+
+                videoDescription.value = data.description;
+                videoTags.value = data.tags;
+
+                console.log('✅ Description and tags generated!');
+            } catch (error) {
+                console.error('❌ Description generation error:', error);
+                videoDescription.value = 'Failed to generate description. You can write your own here.';
+                videoTags.value = 'BattleTech, MechWarrior, horror, sci-fi';
+            }
+        }
+
         function getRandomEffect() {
             // Only zoom effects for speed - 2-3x faster than pan/kenBurns
             const effects = ['zoomIn', 'zoomOut'];
@@ -867,10 +941,19 @@
             validateForm();
         });
 
+        let descriptionTimeout;
         scriptInput.addEventListener('input', (e) => {
             state.script = e.target.value;
             scriptLength.textContent = `${state.script.length.toLocaleString()} characters`;
             validateForm();
+
+            // Auto-generate description if script is substantial (debounced)
+            clearTimeout(descriptionTimeout);
+            if (state.script.length > 500) {
+                descriptionTimeout = setTimeout(() => {
+                    generateDescriptionAndTags(state.script, state.videoTitle);
+                }, 2000); // Wait 2s after user stops typing
+            }
         });
 
         imageCountSlider.addEventListener('input', (e) => {
@@ -919,6 +1002,9 @@
                 autoGenerateScriptBtn.innerHTML = '✅ Script Generated!';
                 autoGenerateScriptBtn.classList.remove('bg-green-700');
                 autoGenerateScriptBtn.classList.add('bg-green-600');
+
+                // Auto-generate description and tags
+                generateDescriptionAndTags(data.script, state.videoTitle);
 
                 setTimeout(() => {
                     autoGenerateScriptBtn.disabled = false;
