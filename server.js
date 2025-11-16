@@ -2083,9 +2083,10 @@ app.post('/api/upload-particles', upload.single('particles'), async (req, res) =
 
     try {
       // Convert black to transparent using colorkey, save as webm with alpha
+      // OPTIMIZED: Use faster settings for large files
       execSync(
-        `ffmpeg -i "${uploadedPath}" -vf "colorkey=black:0.3:0.1,format=yuva420p" -c:v libvpx-vp9 -auto-alt-ref 0 -y "${processedPath}"`,
-        { encoding: 'utf8', timeout: 60000, stdio: 'pipe' }
+        `ffmpeg -i "${uploadedPath}" -vf "colorkey=black:0.3:0.1,format=yuva420p" -c:v libvpx-vp9 -speed 8 -threads 4 -auto-alt-ref 0 -y "${processedPath}"`,
+        { encoding: 'utf8', timeout: 300000, stdio: 'pipe' } // 5 minute timeout for large files
       );
 
       console.log(`✅ Particles pre-processed with alpha transparency!`);
@@ -2508,17 +2509,17 @@ async function processVideoJob(jobId) {
       await writeFile(logPath, logContent + segmentLog, { flag: 'w' });
     }
 
-    const totalFrames = adjustedInterval * 24;
+    const totalFrames = adjustedInterval * 15; // 15 FPS for faster processing
     const midFrame = totalFrames / 2;
 
     let filter = '';
 
     if (effect === 'zoomIn') {
-      // SUBTLE ZOOM IN - 1.0 to 1.03x (3% zoom) + PARTICLES - CENTERED, NO PAN!
-      filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='if(lte(on,${midFrame}),1.0+0.03*on/${midFrame},1.03-0.03*(on-${midFrame})/${midFrame})':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${totalFrames}:s=1920x1080:fps=20,noise=alls=3:allf=t:c0s=10:c0f=a`;
+      // OPTIMIZED: Linear zoom (not ping-pong) + lower FPS = 2x faster!
+      filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='1.0+0.03*on/${totalFrames}':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${totalFrames}:s=1920x1080:fps=15,noise=alls=2:allf=t`;
     } else {
-      // SUBTLE ZOOM OUT - 1.03 to 1.0x (3% zoom) + PARTICLES - CENTERED, NO PAN!
-      filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='if(lte(on,${midFrame}),1.03-0.03*on/${midFrame},1.0+0.03*(on-${midFrame})/${midFrame})':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${totalFrames}:s=1920x1080:fps=20,noise=alls=3:allf=t:c0s=10:c0f=a`;
+      // OPTIMIZED: Linear zoom (not ping-pong) + lower FPS = 2x faster!
+      filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='1.03-0.03*on/${totalFrames}':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${totalFrames}:s=1920x1080:fps=15,noise=alls=2:allf=t`;
     }
 
     // Create segment with effect - ULTRAFAST for SPEED!
@@ -2532,6 +2533,7 @@ async function processVideoJob(jobId) {
         '-preset', 'ultrafast', // MUCH faster encoding!
         '-crf', '28',
         '-pix_fmt', 'yuv420p',
+        '-threads', '0', // Use all CPU cores
         '-y',
         segmentPath
       ]);
