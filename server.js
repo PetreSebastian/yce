@@ -2168,10 +2168,20 @@ async function processVideoJob(jobId) {
   console.log('═══════════════════════════════════════════════════════════════');
   let actualAudioDuration = audioDuration;
 
+  // LOGGING TO FILE for debugging (console is too full!)
+  const logPath = path.join(sessionDir, 'ffprobe-debug.log');
+  let logContent = `\n\n═══ FFPROBE DEBUG LOG - ${new Date().toISOString()} ═══\n`;
+  logContent += `Job ID: ${jobId}\n`;
+  logContent += `Audio path: ${audioPath}\n`;
+  logContent += `Frontend reported duration: ${audioDuration}s (${(audioDuration / 60).toFixed(1)} min)\n`;
+  logContent += `Total images: ${duplicatedImages.length}\n`;
+  logContent += `Initial interval: ${adjustedInterval.toFixed(2)}s per image\n\n`;
+
   try {
     const { execSync } = require('child_process');
     console.log(`📂 Audio file path: ${audioPath}`);
     console.log(`⏳ Running ffprobe...`);
+    logContent += `Running ffprobe...\n`;
 
     const ffprobeOutput = execSync(`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${audioPath}"`, {
       encoding: 'utf8',
@@ -2179,8 +2189,10 @@ async function processVideoJob(jobId) {
     }).trim();
 
     console.log(`📄 ffprobe raw output: "${ffprobeOutput}"`);
+    logContent += `ffprobe raw output: "${ffprobeOutput}"\n`;
 
     const detectedDuration = Math.floor(parseFloat(ffprobeOutput));
+    logContent += `Parsed duration: ${detectedDuration}s\n`;
 
     if (detectedDuration > 0 && !isNaN(detectedDuration)) {
       console.log('');
@@ -2189,9 +2201,14 @@ async function processVideoJob(jobId) {
       console.log(`📊 Difference: ${Math.abs(detectedDuration - audioDuration)}s`);
       console.log('');
 
+      logContent += `\nFrontend: ${audioDuration}s\n`;
+      logContent += `ffprobe:  ${detectedDuration}s\n`;
+      logContent += `Difference: ${Math.abs(detectedDuration - audioDuration)}s\n\n`;
+
       // ALWAYS use ffprobe value as source of truth!
       actualAudioDuration = detectedDuration;
       console.log(`✅✅✅ USING FFPROBE AS SOURCE OF TRUTH: ${actualAudioDuration}s ✅✅✅`);
+      logContent += `✅ USING FFPROBE AS SOURCE OF TRUTH: ${actualAudioDuration}s\n\n`;
 
       // Recalculate adjusted interval with REAL audio duration
       const recalculatedInterval = actualAudioDuration / duplicatedImages.length;
@@ -2202,8 +2219,16 @@ async function processVideoJob(jobId) {
       console.log(`✅ MATCH: ${(recalculatedInterval * duplicatedImages.length).toFixed(1)}s = ${actualAudioDuration}s`);
       console.log('');
 
+      logContent += `OLD interval: ${adjustedInterval.toFixed(2)}s\n`;
+      logContent += `NEW interval: ${recalculatedInterval.toFixed(2)}s\n`;
+      logContent += `Expected video length: ${(recalculatedInterval * duplicatedImages.length).toFixed(1)}s\n`;
+      logContent += `Audio length: ${actualAudioDuration}s\n`;
+      logContent += `MATCH: ${(recalculatedInterval * duplicatedImages.length).toFixed(1)}s = ${actualAudioDuration}s\n\n`;
+
       // Override the adjustedInterval with accurate value
       adjustedInterval = recalculatedInterval;
+
+      logContent += `✅ adjustedInterval UPDATED TO: ${adjustedInterval}s\n`;
 
       // Also update audioDuration variable
       audioDuration = actualAudioDuration;
@@ -2211,12 +2236,16 @@ async function processVideoJob(jobId) {
     } else {
       console.error(`❌❌❌ FFPROBE RETURNED INVALID DURATION: "${detectedDuration}"`);
       console.error(`❌ Using frontend value: ${audioDuration}s (THIS MAY CAUSE ISSUES!)`);
+      logContent += `❌ FFPROBE INVALID: "${detectedDuration}"\n`;
+      logContent += `❌ Using frontend value: ${audioDuration}s\n`;
     }
   } catch (error) {
     console.error('❌❌❌ FFPROBE FAILED (CRITICAL ERROR!) ❌❌❌');
     console.error('Error:', error.message);
     console.error(`⚠️ Continuing with frontend duration: ${audioDuration}s`);
     console.error(`⚠️ THIS MAY CAUSE VIDEO/AUDIO SYNC ISSUES!`);
+    logContent += `❌ FFPROBE FAILED: ${error.message}\n`;
+    logContent += `Using frontend duration: ${audioDuration}s\n`;
   }
 
   console.log('═══════════════════════════════════════════════════════════════');
@@ -2227,6 +2256,17 @@ async function processVideoJob(jobId) {
   console.log(`   - Expected video length: ${(adjustedInterval * duplicatedImages.length).toFixed(1)}s`);
   console.log('═══════════════════════════════════════════════════════════════');
   console.log('');
+
+  logContent += `\n═══ FINAL VALUES ═══\n`;
+  logContent += `audioDuration: ${audioDuration}s (${(audioDuration / 60).toFixed(1)} min)\n`;
+  logContent += `adjustedInterval: ${adjustedInterval.toFixed(4)}s per image\n`;
+  logContent += `Total images: ${duplicatedImages.length}\n`;
+  logContent += `Expected video length: ${(adjustedInterval * duplicatedImages.length).toFixed(1)}s\n`;
+  logContent += `═════════════════════════\n`;
+
+  // Write log to file
+  await writeFile(logPath, logContent);
+  console.log(`📝 Debug log saved to: ${logPath}`);
 
   updateJobStatus(jobId, { progress: 15 });
 
@@ -2306,6 +2346,14 @@ async function processVideoJob(jobId) {
   for (let i = 0; i < imagePaths.length; i++) {
     const effect = duplicatedEffects[i] || 'zoomIn';
     const segmentPath = path.join(sessionDir, `segment_${i.toString().padStart(4, '0')}.mp4`);
+
+    // LOG THE ACTUAL INTERVAL BEING USED!
+    if (i === 0) {
+      console.log(`🎬 Creating first segment with adjustedInterval = ${adjustedInterval.toFixed(4)}s`);
+      logContent += `\n🎬 SEGMENT CREATION STARTED\n`;
+      logContent += `First segment using interval: ${adjustedInterval.toFixed(4)}s\n`;
+      await writeFile(logPath, logContent);
+    }
 
     const totalFrames = adjustedInterval * 24;
     const midFrame = totalFrames / 2;
