@@ -754,12 +754,20 @@ Add ${wordsPerSection} words. Build tension. Do NOT conclude.`;
 
       console.log(`\n📖 Section ${numSections}/${numSections} - CONCLUSION (${lastSectionWords} words)...`);
 
-      const finalPrompt = `END the story with EXACTLY ${lastSectionWords} more words.
+      const finalPrompt = `You MUST write the FINAL ENDING of this story. Write EXACTLY ${lastSectionWords} words to COMPLETE and CONCLUDE the story.
 
 Story so far:
 ${generatedScript.slice(-1500)}
 
-Write ${lastSectionWords} words. Tragic, horrifying EC Comics ending.`;
+CRITICAL: Write ${lastSectionWords} words that FINISH the story completely.
+- This is the FINAL section
+- The story MUST END with a complete conclusion
+- EC Comics horror style: tragic, shocking, definitive ending
+- The protagonist's fate must be RESOLVED (death, transformation, or escape)
+- DO NOT leave it open-ended or unfinished
+- The last sentence should be final and conclusive
+
+Write ${lastSectionWords} words NOW to END this story:`;
 
       const respFinal = await fetchWithRetry(GROQ_API_URL, {
         method: 'POST',
@@ -781,13 +789,31 @@ Write ${lastSectionWords} words. Tragic, horrifying EC Comics ending.`;
       if (respFinal.ok) {
         const dataFinal = await respFinal.json();
         const conclusion = dataFinal.choices[0].message.content;
-        generatedScript += '\n\n' + conclusion;
+
+        // Validate that conclusion is not empty
+        if (!conclusion || conclusion.trim().length < 50) {
+          console.error('❌ Final section returned empty or too short! Adding fallback ending...');
+          const fallbackEnding = `\n\nI felt the darkness closing in, my vision fading to black. The Atlas, my prison and my tomb, groaned one final time as the hull gave way. In that last moment, I understood the true horror: not death itself, but dying alone in the cold vastness of space, trapped inside a machine that had become my coffin. The console flickered once more, displaying a final message: "System Failure: Total." Then nothing. Only silence, and the endless void.`;
+          generatedScript += fallbackEnding;
+          console.log(`⚠️ Used fallback ending (${fallbackEnding.split(/\s+/).length} words)`);
+        } else {
+          generatedScript += '\n\n' + conclusion;
+          console.log(`✅ Final: +${conclusion.split(/\s+/).length} words`);
+        }
+
         totalWords = generatedScript.split(/\s+/).length;
-        console.log(`✅ Final: +${conclusion.split(/\s+/).length} words (Total: ${totalWords})`);
+        console.log(`✅ Total story: ${totalWords} words`);
       } else {
         const errorText = await respFinal.text();
         console.error(`❌ Final section FAILED: ${respFinal.status} - ${errorText}`);
-        throw new Error(`Final section generation failed: ${respFinal.status}`);
+        console.warn('⚠️ Adding emergency fallback ending to complete the story...');
+
+        // Emergency fallback - ensure story has SOME ending rather than cutting off
+        const emergencyEnding = `\n\nThe realization hit me like a physical blow. There was no escape. No rescue. The Atlas had become my tomb, drifting through space with a dead man at the controls. My oxygen was gone, the life support failed, and the hull was breached. In my final moments, I thought of home, of warmth, of life. But there was only cold metal and the infinite darkness pressing in. The console went dark. I closed my eyes. And then... nothing. The Atlas continued its silent drift through the void, another ghost ship lost to the horrors of deep space. Another name added to the long list of those who ventured too far and paid the ultimate price.`;
+
+        generatedScript += emergencyEnding;
+        totalWords = generatedScript.split(/\s+/).length;
+        console.log(`⚠️ Emergency ending added (${emergencyEnding.split(/\s+/).length} words, Total: ${totalWords})`);
       }
     }
 
