@@ -2276,10 +2276,33 @@ async function processVideoJob(jobId) {
       logContent += `ffprobe:  ${detectedDuration}s\n`;
       logContent += `Difference: ${Math.abs(detectedDuration - audioDuration)}s\n\n`;
 
-      // ALWAYS use ffprobe value as source of truth!
-      actualAudioDuration = detectedDuration;
-      console.log(`✅✅✅ USING FFPROBE AS SOURCE OF TRUTH: ${actualAudioDuration}s ✅✅✅`);
-      logContent += `✅ USING FFPROBE AS SOURCE OF TRUTH: ${actualAudioDuration}s\n\n`;
+      // CRITICAL FIX: If difference is >20% AND ffprobe shows header warning, TRUST FRONTEND!
+      // TTS-generated MP3s often have corrupted headers that make ffprobe return wrong duration
+      const differencePercent = Math.abs(detectedDuration - audioDuration) / audioDuration * 100;
+      const hasHeaderWarning = ffprobeOutput.includes('Header missing') ||
+                               fallbackDuration !== null;
+
+      if (differencePercent > 20) {
+        console.log(`⚠️⚠️⚠️ LARGE MISMATCH: ${differencePercent.toFixed(1)}% difference!`);
+        logContent += `⚠️ Large mismatch: ${differencePercent.toFixed(1)}%\n`;
+
+        if (hasHeaderWarning || differencePercent > 30) {
+          console.log(`🔴 MP3 header appears corrupted - TRUSTING FRONTEND duration!`);
+          console.log(`✅✅✅ USING FRONTEND AS SOURCE OF TRUTH: ${audioDuration}s ✅✅✅`);
+          logContent += `🔴 Corrupted header detected - using FRONTEND duration\n`;
+          logContent += `✅ USING FRONTEND: ${audioDuration}s\n\n`;
+          actualAudioDuration = audioDuration; // Trust frontend!
+        } else {
+          console.log(`✅✅✅ USING FFPROBE AS SOURCE OF TRUTH: ${detectedDuration}s ✅✅✅`);
+          logContent += `✅ USING FFPROBE: ${detectedDuration}s\n\n`;
+          actualAudioDuration = detectedDuration;
+        }
+      } else {
+        // Small difference (<20%), use ffprobe
+        console.log(`✅✅✅ USING FFPROBE AS SOURCE OF TRUTH: ${detectedDuration}s ✅✅✅`);
+        logContent += `✅ USING FFPROBE: ${detectedDuration}s (small diff)\n\n`;
+        actualAudioDuration = detectedDuration;
+      }
 
       // Recalculate adjusted interval with REAL audio duration
       const recalculatedInterval = actualAudioDuration / duplicatedImages.length;
@@ -2301,14 +2324,12 @@ async function processVideoJob(jobId) {
 
       logContent += `✅ adjustedInterval UPDATED TO: ${adjustedInterval}s\n`;
 
-      // Also update audioDuration variable
-      audioDuration = actualAudioDuration;
-
     } else {
       console.error(`❌❌❌ FFPROBE RETURNED INVALID DURATION: "${detectedDuration}"`);
       console.error(`❌ Using frontend value: ${audioDuration}s (THIS MAY CAUSE ISSUES!)`);
       logContent += `❌ FFPROBE INVALID: "${detectedDuration}"\n`;
       logContent += `❌ Using frontend value: ${audioDuration}s\n`;
+      actualAudioDuration = audioDuration; // Fallback to frontend
     }
   } catch (error) {
     console.error('❌❌❌ FFPROBE FAILED (CRITICAL ERROR!) ❌❌❌');
@@ -2317,11 +2338,12 @@ async function processVideoJob(jobId) {
     console.error(`⚠️ THIS MAY CAUSE VIDEO/AUDIO SYNC ISSUES!`);
     logContent += `❌ FFPROBE FAILED: ${error.message}\n`;
     logContent += `Using frontend duration: ${audioDuration}s\n`;
+    actualAudioDuration = audioDuration; // Fallback to frontend on error
   }
 
   console.log('═══════════════════════════════════════════════════════════════');
   console.log(`📊 FINAL VALUES FOR VIDEO GENERATION:`);
-  console.log(`   - audioDuration: ${audioDuration}s (${(audioDuration / 60).toFixed(1)} min)`);
+  console.log(`   - ACTUAL audio duration: ${actualAudioDuration}s (${(actualAudioDuration / 60).toFixed(1)} min)`);
   console.log(`   - adjustedInterval: ${adjustedInterval.toFixed(2)}s per image`);
   console.log(`   - Total images: ${duplicatedImages.length}`);
   console.log(`   - Expected video length: ${(adjustedInterval * duplicatedImages.length).toFixed(1)}s`);
@@ -2329,7 +2351,7 @@ async function processVideoJob(jobId) {
   console.log('');
 
   logContent += `\n═══ FINAL VALUES ═══\n`;
-  logContent += `audioDuration: ${audioDuration}s (${(audioDuration / 60).toFixed(1)} min)\n`;
+  logContent += `ACTUAL audio duration: ${actualAudioDuration}s (${(actualAudioDuration / 60).toFixed(1)} min)\n`;
   logContent += `adjustedInterval: ${adjustedInterval.toFixed(4)}s per image\n`;
   logContent += `Total images: ${duplicatedImages.length}\n`;
   logContent += `Expected video length: ${(adjustedInterval * duplicatedImages.length).toFixed(1)}s\n`;
