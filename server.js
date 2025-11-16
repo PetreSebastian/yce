@@ -2037,6 +2037,29 @@ app.post('/api/upload-audio', upload.single('audio'), (req, res) => {
   }
 });
 
+// Upload particles file
+app.post('/api/upload-particles', upload.single('particles'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No particles file uploaded' });
+    }
+
+    const particlesPath = `/temp/uploads/${path.basename(req.file.path)}`;
+
+    console.log(`✨ Uploaded particles: ${req.file.originalname} (${req.file.size} bytes)`);
+
+    res.json({
+      success: true,
+      particlesPath: particlesPath,
+      originalName: req.file.originalname,
+      size: req.file.size
+    });
+  } catch (error) {
+    console.error('❌ Particles upload error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ============================================================
 // ASYNC VIDEO GENERATION ENDPOINTS
 // ============================================================
@@ -2107,7 +2130,7 @@ async function processVideoJob(jobId) {
 
   updateJobStatus(jobId, { status: 'processing', progress: 5 });
 
-  const { images, effects: imageEffects, audioBase64, imageInterval, audioDuration } = job.data;
+  const { images, effects: imageEffects, audioBase64, imageInterval, audioDuration, particlesPath } = job.data;
 
   if (!images || !Array.isArray(images) || images.length === 0) {
     throw new Error('Images array is required');
@@ -2438,27 +2461,94 @@ async function processVideoJob(jobId) {
 
   updateJobStatus(jobId, { progress: 80 });
 
-  // Merge video with audio and add atmospheric effects
+  // Prepare particles if uploaded
+  let particlesFilePath = null;
+  let particlesDuration = 0;
+  let loopCount = 0;
+
+  if (particlesPath) {
+    particlesFilePath = path.join(__dirname, particlesPath);
+    console.log(`✨ Particles video found: ${particlesPath}`);
+
+    // Get particles duration with ffprobe
+    try {
+      const { execSync } = require('child_process');
+      const particlesProbeOutput = execSync(
+        `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${particlesFilePath}"`,
+        { encoding: 'utf8', timeout: 10000 }
+      ).trim();
+
+      particlesDuration = parseFloat(particlesProbeOutput);
+
+      if (particlesDuration > 0 && !isNaN(particlesDuration)) {
+        // Calculate how many times to loop particles to cover full video duration
+        loopCount = Math.ceil(actualAudioDuration / particlesDuration);
+        console.log(`✨ Particles duration: ${particlesDuration}s`);
+        console.log(`✨ Video duration: ${actualAudioDuration}s`);
+        console.log(`✨ Loop particles ${loopCount} times`);
+      } else {
+        console.warn('⚠️ Invalid particles duration, skipping particles');
+        particlesFilePath = null;
+      }
+    } catch (error) {
+      console.error('❌ Failed to probe particles video:', error.message);
+      particlesFilePath = null;
+    }
+  }
+
+  // Merge video with audio and add atmospheric effects (+ particles overlay if available)
   console.log('🎵 Merging video with audio and adding atmospheric effects...');
+  if (particlesFilePath) {
+    console.log('✨ Adding particles overlay with transparent black background removal...');
+  }
   const finalVideoPath = path.join(sessionDir, 'final_video.mp4');
 
   await new Promise((resolve, reject) => {
-    const ffmpeg = spawn('ffmpeg', [
-      '-i', videoOnlyPath,
-      '-i', audioPath,
-      '-filter_complex',
-      `[0:v]noise=alls=10:allf=t+u,eq=brightness=0.02:contrast=1.05:saturation=0.95[vout]`,
-      '-map', '[vout]',
-      '-map', '1:a',
-      '-c:v', 'libx264',
-      '-preset', 'veryfast',
-      '-crf', '26',
-      '-c:a', 'aac',
-      '-b:a', '128k',
-      '-shortest',
-      '-y',
-      finalVideoPath
-    ]);
+    let ffmpegArgs;
+
+    if (particlesFilePath) {
+      // WITH PARTICLES: Add colorkey filter to remove black background and overlay
+      ffmpegArgs = [
+        '-i', videoOnlyPath,
+        '-i', audioPath,
+        '-stream_loop', String(loopCount - 1), // Loop particles (minus 1 because first play doesn't count)
+        '-i', particlesFilePath,
+        '-filter_complex',
+        `[0:v]noise=alls=10:allf=t+u,eq=brightness=0.02:contrast=1.05:saturation=0.95[vid];` +
+        `[2:v]colorkey=black:0.3:0.1[particles];` + // Remove black background from particles
+        `[vid][particles]overlay=0:0:shortest=1[vout]`, // Overlay particles on video
+        '-map', '[vout]',
+        '-map', '1:a',
+        '-c:v', 'libx264',
+        '-preset', 'veryfast',
+        '-crf', '26',
+        '-c:a', 'aac',
+        '-b:a', '128k',
+        '-shortest',
+        '-y',
+        finalVideoPath
+      ];
+    } else {
+      // WITHOUT PARTICLES: Normal atmospheric effects only
+      ffmpegArgs = [
+        '-i', videoOnlyPath,
+        '-i', audioPath,
+        '-filter_complex',
+        `[0:v]noise=alls=10:allf=t+u,eq=brightness=0.02:contrast=1.05:saturation=0.95[vout]`,
+        '-map', '[vout]',
+        '-map', '1:a',
+        '-c:v', 'libx264',
+        '-preset', 'veryfast',
+        '-crf', '26',
+        '-c:a', 'aac',
+        '-b:a', '128k',
+        '-shortest',
+        '-y',
+        finalVideoPath
+      ];
+    }
+
+    const ffmpeg = spawn('ffmpeg', ffmpegArgs);
 
     let ffmpegError = '';
     let ffmpegOutput = '';

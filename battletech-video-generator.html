@@ -445,6 +445,44 @@
                 </div>
             </div>
 
+            <!-- Step 5: Particle Effects (Optional) -->
+            <div id="step5" class="bg-gray-800 border-2 border-gray-700 p-6 rounded-lg mb-6">
+                <h2 class="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                    ✨ STEP 5: Particle Effects (Optional)
+                </h2>
+
+                <div class="bg-blue-900/30 border-2 border-blue-700 p-4 rounded-lg">
+                    <p class="text-blue-200 font-semibold mb-3">🎬 PARTICLE OVERLAY (Optional):</p>
+
+                    <label class="block text-white font-semibold mb-2">
+                        📤 Upload Particles Video (MP4 with BLACK background):
+                    </label>
+                    <input
+                        type="file"
+                        id="particlesFileInput"
+                        accept="video/mp4"
+                        class="block w-full text-sm text-gray-300
+                            file:mr-4 file:py-2 file:px-4
+                            file:rounded-lg file:border-0
+                            file:text-sm file:font-semibold
+                            file:bg-blue-600 file:text-white
+                            hover:file:bg-blue-700 cursor-pointer"
+                    />
+                    <p class="text-gray-400 text-sm mt-2">
+                        💡 Upload a particles video (dust, sparks, etc.) with BLACK background
+                    </p>
+                    <p class="text-gray-400 text-sm mt-1">
+                        🔥 Black background will be removed automatically (transparent overlay)
+                    </p>
+                    <p class="text-gray-400 text-sm mt-1">
+                        🔄 Video will loop automatically to match final video duration
+                    </p>
+                    <p id="particlesFileName" class="text-green-400 text-sm mt-2 hidden">
+                        ✅ Particles loaded: <span id="particlesFileNameText"></span>
+                    </p>
+                </div>
+            </div>
+
             <!-- Generate Button -->
             <button
                 id="generateBtn"
@@ -564,6 +602,7 @@
             audioDuration: 0,
             audioMode: 'generate', // 'generate' or 'upload'
             uploadedAudioFile: null,
+            particlesFile: null, // Optional particles video for overlay
             imageProvider: 'pollinations' // FREE - no API key needed!
         };
 
@@ -871,6 +910,11 @@
         const audioFileName = document.getElementById('audioFileName');
         const audioFileNameText = document.getElementById('audioFileNameText');
 
+        // Particles elements
+        const particlesFileInput = document.getElementById('particlesFileInput');
+        const particlesFileName = document.getElementById('particlesFileName');
+        const particlesFileNameText = document.getElementById('particlesFileNameText');
+
         // Utility Functions
         function showError(message) {
             errorBox.textContent = message;
@@ -1133,6 +1177,24 @@
                 });
             };
             reader.readAsDataURL(file);
+        });
+
+        // Particles file upload handler
+        particlesFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (!file.type.includes('video')) {
+                showError('Please upload a video file (MP4)');
+                return;
+            }
+
+            // Store the file for later upload
+            state.particlesFile = file;
+            console.log(`✨ Particles video loaded: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
+
+            particlesFileNameText.textContent = file.name;
+            particlesFileName.classList.remove('hidden');
         });
 
         openClaudeBtn.addEventListener('click', () => {
@@ -1681,6 +1743,26 @@
                     audioPath = state.audioBase64;
                 }
 
+                // Upload particles if it exists
+                let particlesPath = null;
+                if (state.particlesFile) {
+                    const formData = new FormData();
+                    formData.append('particles', state.particlesFile);
+
+                    const uploadResponse = await fetch(`${API_BASE_URL}/api/upload-particles`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!uploadResponse.ok) {
+                        console.warn('⚠️ Particles upload failed - continuing without particles');
+                    } else {
+                        const uploadData = await uploadResponse.json();
+                        particlesPath = uploadData.particlesPath;
+                        console.log(`✨ Uploaded particles: ${particlesPath}`);
+                    }
+                }
+
                 // Step 4: Render video (ASYNC with polling!)
                 updateStepStatus('video', 'active');
                 document.getElementById('currentStep').textContent = 'Starting video render (this may take 10-30 minutes for long videos)...';
@@ -1698,7 +1780,8 @@
                         effects: state.imageEffects,
                         audioBase64: audioPath, // Can be either file path or base64
                         imageInterval: imageInterval,
-                        audioDuration: state.audioDuration
+                        audioDuration: state.audioDuration,
+                        particlesPath: particlesPath // Optional particles overlay
                     })
                 });
 
