@@ -2607,40 +2607,44 @@ async function processVideoJob(jobId) {
 
     if (particlesFilePath) {
       // WITH PARTICLES: Add colorkey filter to remove black background and overlay
+      // OPTIMIZED: ultrafast preset + simplified filters for MUCH faster processing
       ffmpegArgs = [
         '-i', videoOnlyPath,
         '-i', audioPath,
         '-stream_loop', String(loopCount - 1), // Loop particles (minus 1 because first play doesn't count)
         '-i', particlesFilePath,
         '-filter_complex',
-        `[0:v]noise=alls=10:allf=t+u,eq=brightness=0.02:contrast=1.05:saturation=0.95[vid];` +
+        `[0:v]noise=alls=5:allf=t,eq=brightness=0.02:contrast=1.05:saturation=0.95[vid];` + // Reduced noise for speed
         `[2:v]colorkey=black:0.3:0.1[particles];` + // Remove black background from particles
         `[vid][particles]overlay=0:0:shortest=1[vout]`, // Overlay particles on video
         '-map', '[vout]',
         '-map', '1:a',
         '-c:v', 'libx264',
-        '-preset', 'veryfast',
-        '-crf', '26',
+        '-preset', 'ultrafast', // MUCH faster encoding (was veryfast)
+        '-crf', '28', // Slightly lower quality but MUCH faster (was 26)
         '-c:a', 'aac',
-        '-b:a', '128k',
+        '-b:a', '96k', // Lower audio bitrate for speed (was 128k)
+        '-threads', '0', // Use all CPU cores
         '-shortest',
         '-y',
         finalVideoPath
       ];
     } else {
       // WITHOUT PARTICLES: Normal atmospheric effects only
+      // OPTIMIZED: ultrafast preset + simplified filters for MUCH faster processing
       ffmpegArgs = [
         '-i', videoOnlyPath,
         '-i', audioPath,
         '-filter_complex',
-        `[0:v]noise=alls=10:allf=t+u,eq=brightness=0.02:contrast=1.05:saturation=0.95[vout]`,
+        `[0:v]noise=alls=5:allf=t,eq=brightness=0.02:contrast=1.05:saturation=0.95[vout]`, // Reduced noise for speed
         '-map', '[vout]',
         '-map', '1:a',
         '-c:v', 'libx264',
-        '-preset', 'veryfast',
-        '-crf', '26',
+        '-preset', 'ultrafast', // MUCH faster encoding (was veryfast)
+        '-crf', '28', // Slightly lower quality but MUCH faster (was 26)
         '-c:a', 'aac',
-        '-b:a', '128k',
+        '-b:a', '96k', // Lower audio bitrate for speed (was 128k)
+        '-threads', '0', // Use all CPU cores
         '-shortest',
         '-y',
         finalVideoPath
@@ -2691,7 +2695,23 @@ async function processVideoJob(jobId) {
     // Add 60-minute timeout for very long videos (50+ min audio)
     const timeout = setTimeout(() => {
       console.error('⏱️ FFmpeg timeout after 60 minutes - killing process');
-      ffmpeg.kill('SIGKILL');
+
+      // Cross-platform process kill
+      try {
+        if (process.platform === 'win32') {
+          // Windows: Kill process tree with taskkill
+          const { execSync } = require('child_process');
+          execSync(`taskkill /F /T /PID ${ffmpeg.pid}`, { stdio: 'ignore' });
+          console.log('✅ Killed FFmpeg process tree (Windows)');
+        } else {
+          // Unix: Kill with SIGKILL
+          ffmpeg.kill('SIGKILL');
+          console.log('✅ Killed FFmpeg process (Unix)');
+        }
+      } catch (killError) {
+        console.error('⚠️ Failed to kill FFmpeg:', killError.message);
+      }
+
       reject(new Error('FFmpeg timeout after 60 minutes'));
     }, 3600000);
 
