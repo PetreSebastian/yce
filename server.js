@@ -2064,22 +2064,54 @@ app.post('/api/upload-audio', upload.single('audio'), (req, res) => {
 });
 
 // Upload particles file
-app.post('/api/upload-particles', upload.single('particles'), (req, res) => {
+app.post('/api/upload-particles', upload.single('particles'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No particles file uploaded' });
     }
 
+    const uploadedPath = req.file.path;
     const particlesPath = `/temp/uploads/${path.basename(req.file.path)}`;
 
     console.log(`✨ Uploaded particles: ${req.file.originalname} (${req.file.size} bytes)`);
+    console.log(`🔄 Pre-processing particles: converting black to alpha transparency...`);
 
-    res.json({
-      success: true,
-      particlesPath: particlesPath,
-      originalName: req.file.originalname,
-      size: req.file.size
-    });
+    // PRE-PROCESS: Convert black background to alpha transparency
+    // This makes overlay operations MUCH faster at render time!
+    const processedPath = uploadedPath.replace(/\.[^.]+$/, '_alpha.webm');
+    const { execSync } = require('child_process');
+
+    try {
+      // Convert black to transparent using colorkey, save as webm with alpha
+      execSync(
+        `ffmpeg -i "${uploadedPath}" -vf "colorkey=black:0.3:0.1,format=yuva420p" -c:v libvpx-vp9 -auto-alt-ref 0 -y "${processedPath}"`,
+        { encoding: 'utf8', timeout: 60000, stdio: 'pipe' }
+      );
+
+      console.log(`✅ Particles pre-processed with alpha transparency!`);
+      console.log(`💾 Original: ${req.file.size} bytes, Processed: ${fs.statSync(processedPath).size} bytes`);
+
+      // Use processed version
+      const processedParticlesPath = `/temp/uploads/${path.basename(processedPath)}`;
+
+      res.json({
+        success: true,
+        particlesPath: processedParticlesPath,
+        originalName: req.file.originalname,
+        size: fs.statSync(processedPath).size,
+        preprocessed: true
+      });
+    } catch (ffmpegError) {
+      console.error('⚠️ Pre-processing failed, using original file:', ffmpegError.message);
+      // Fallback to original file if pre-processing fails
+      res.json({
+        success: true,
+        particlesPath: particlesPath,
+        originalName: req.file.originalname,
+        size: req.file.size,
+        preprocessed: false
+      });
+    }
   } catch (error) {
     console.error('❌ Particles upload error:', error);
     res.status(500).json({ error: error.message });
@@ -2596,55 +2628,77 @@ async function processVideoJob(jobId) {
   }
 
   // Merge video with audio and add atmospheric effects (+ particles overlay if available)
-  console.log('🎵 Merging video with audio and adding atmospheric effects...');
+  console.log('🎵 Merging video with audio...');
   if (particlesFilePath) {
-    console.log('✨ Adding particles overlay with transparent black background removal...');
+    console.log('✨ Adding particles overlay...');
   }
   const finalVideoPath = path.join(sessionDir, 'final_video.mp4');
+
+  // Check if particles are pre-processed with alpha transparency
+  const isPreprocessed = particlesFilePath && particlesFilePath.includes('_alpha.webm');
+  if (isPreprocessed) {
+    console.log('🚀 Using pre-processed particles with alpha transparency - INSTANT overlay!');
+  }
 
   await new Promise((resolve, reject) => {
     let ffmpegArgs;
 
     if (particlesFilePath) {
-      // WITH PARTICLES: Add colorkey filter to remove black background and overlay
-      // OPTIMIZED: ultrafast preset + simplified filters for MUCH faster processing
-      ffmpegArgs = [
-        '-i', videoOnlyPath,
-        '-i', audioPath,
-        '-stream_loop', String(loopCount - 1), // Loop particles (minus 1 because first play doesn't count)
-        '-i', particlesFilePath,
-        '-filter_complex',
-        `[0:v]noise=alls=5:allf=t,eq=brightness=0.02:contrast=1.05:saturation=0.95[vid];` + // Reduced noise for speed
-        `[2:v]colorkey=black:0.3:0.1[particles];` + // Remove black background from particles
-        `[vid][particles]overlay=0:0:shortest=1[vout]`, // Overlay particles on video
-        '-map', '[vout]',
-        '-map', '1:a',
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast', // MUCH faster encoding (was veryfast)
-        '-crf', '28', // Slightly lower quality but MUCH faster (was 26)
-        '-c:a', 'aac',
-        '-b:a', '96k', // Lower audio bitrate for speed (was 128k)
-        '-threads', '0', // Use all CPU cores
-        '-shortest',
-        '-y',
-        finalVideoPath
-      ];
+      if (isPreprocessed) {
+        // PRE-PROCESSED PARTICLES: Just overlay - no colorkey needed! SUPER FAST!
+        ffmpegArgs = [
+          '-i', videoOnlyPath,
+          '-i', audioPath,
+          '-stream_loop', String(loopCount - 1), // Loop particles
+          '-i', particlesFilePath,
+          '-filter_complex',
+          // Particles already have alpha - just overlay! Instant!
+          `[0:v][2:v]overlay=0:0:shortest=1[vout]`,
+          '-map', '[vout]',
+          '-map', '1:a',
+          '-c:v', 'libx264',
+          '-preset', 'ultrafast',
+          '-crf', '28',
+          '-c:a', 'aac',
+          '-b:a', '96k',
+          '-threads', '0',
+          '-shortest',
+          '-y',
+          finalVideoPath
+        ];
+      } else {
+        // NON-PREPROCESSED: Use colorkey to remove black
+        ffmpegArgs = [
+          '-i', videoOnlyPath,
+          '-i', audioPath,
+          '-stream_loop', String(loopCount - 1), // Loop particles
+          '-i', particlesFilePath,
+          '-filter_complex',
+          // Process particles with colorkey then overlay
+          `[2:v]colorkey=black:0.3:0.1[particles];` +
+          `[0:v][particles]overlay=0:0:shortest=1[vout]`,
+          '-map', '[vout]',
+          '-map', '1:a',
+          '-c:v', 'libx264',
+          '-preset', 'ultrafast',
+          '-crf', '28',
+          '-c:a', 'aac',
+          '-b:a', '96k',
+          '-threads', '0',
+          '-shortest',
+          '-y',
+          finalVideoPath
+        ];
+      }
     } else {
-      // WITHOUT PARTICLES: Normal atmospheric effects only
-      // OPTIMIZED: ultrafast preset + simplified filters for MUCH faster processing
+      // WITHOUT PARTICLES: Just merge audio with video - segments already have effects!
+      // OPTIMIZED: No filters needed - just stream copy video + audio merge = INSTANT!
       ffmpegArgs = [
         '-i', videoOnlyPath,
         '-i', audioPath,
-        '-filter_complex',
-        `[0:v]noise=alls=5:allf=t,eq=brightness=0.02:contrast=1.05:saturation=0.95[vout]`, // Reduced noise for speed
-        '-map', '[vout]',
-        '-map', '1:a',
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast', // MUCH faster encoding (was veryfast)
-        '-crf', '28', // Slightly lower quality but MUCH faster (was 26)
+        '-c:v', 'copy', // Stream copy - no re-encoding! INSTANT!
         '-c:a', 'aac',
-        '-b:a', '96k', // Lower audio bitrate for speed (was 128k)
-        '-threads', '0', // Use all CPU cores
+        '-b:a', '96k',
         '-shortest',
         '-y',
         finalVideoPath
