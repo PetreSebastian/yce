@@ -1569,9 +1569,14 @@
                             audio.load();
                         });
                     } else {
-                        // Fallback for long audio
-                        state.audioDuration = 3000; // 50 minutes default
-                        console.log(`🎵 Using default long duration: ${state.audioDuration} seconds`);
+                        // Fallback: ONLY set default if duration wasn't already detected during file upload
+                        if (!state.audioDuration || state.audioDuration <= 0) {
+                            state.audioDuration = 3000; // 50 minutes default
+                            console.log(`🎵 Using default long duration: ${state.audioDuration} seconds`);
+                        } else {
+                            // Duration was already correctly detected during file upload - DON'T OVERWRITE!
+                            console.log(`✅ Using previously detected duration: ${state.audioDuration}s (${(state.audioDuration / 60).toFixed(1)} min)`);
+                        }
                     }
 
                     console.log('✅ Audio setup complete - NO TTS GENERATED!');
