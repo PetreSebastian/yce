@@ -2350,9 +2350,8 @@ async function processVideoJob(jobId) {
     // LOG THE ACTUAL INTERVAL BEING USED!
     if (i === 0) {
       console.log(`🎬 Creating first segment with adjustedInterval = ${adjustedInterval.toFixed(4)}s`);
-      logContent += `\n🎬 SEGMENT CREATION STARTED\n`;
-      logContent += `First segment using interval: ${adjustedInterval.toFixed(4)}s\n`;
-      await writeFile(logPath, logContent);
+      const segmentLog = `\n🎬 SEGMENT CREATION STARTED\nFirst segment using interval: ${adjustedInterval.toFixed(4)}s\nTotal frames: ${adjustedInterval * 24}\n`;
+      await writeFile(logPath, logContent + segmentLog, { flag: 'w' });
     }
 
     const totalFrames = adjustedInterval * 24;
