@@ -1448,7 +1448,8 @@ app.post('/api/download-thumbnail', async (req, res) => {
         throw new Error(`Failed to download image: ${imageResponse.status}`);
       }
 
-      const imageBuffer = await imageResponse.buffer();
+      // Native fetch uses arrayBuffer(), not buffer()
+      const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
       await writeFile(localPath, imageBuffer);
 
       console.log(`✅ URL thumbnail downloaded: ${localPath}`);
@@ -1639,7 +1640,8 @@ app.post('/api/create-video', async (req, res) => {
             continue;
           }
 
-          const imageBuffer = await imageResponse.buffer();
+          // Native fetch uses arrayBuffer(), not buffer()
+          const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
 
           // Verify it's actually image data
           if (imageBuffer.length < 1000) {
@@ -2080,7 +2082,8 @@ async function processVideoJob(jobId) {
           continue;
         }
 
-        const imageBuffer = await imageResponse.buffer();
+        // Native fetch uses arrayBuffer(), not buffer()
+        const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
 
         if (imageBuffer.length < 1000) {
           console.error(`⚠️ Image ${i} is too small (${imageBuffer.length} bytes), probably invalid`);
