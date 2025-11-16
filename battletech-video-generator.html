@@ -570,12 +570,21 @@
                 <p class="text-green-200 mb-4">Your BattleTech horror video is ready for download.</p>
                 <p class="text-gray-300 text-sm">📁 File: <span class="font-mono bg-gray-800 px-2 py-1 rounded">final-video-with-audio.mp4</span></p>
                 <p class="text-gray-300 text-sm mt-2">📊 Resolution: 1920x1080 (Full HD 16:9)</p>
-                <button
-                    id="newVideoBtn"
-                    class="mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg transition-all"
-                >
-                    🎬 Create Another Video
-                </button>
+
+                <div class="mt-4 flex gap-3 flex-wrap">
+                    <button
+                        id="downloadImagesBtn"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-all"
+                    >
+                        🖼️ Download Generated Images
+                    </button>
+                    <button
+                        id="newVideoBtn"
+                        class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg transition-all"
+                    >
+                        🎬 Create Another Video
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -1232,6 +1241,92 @@
 
         newVideoBtn.addEventListener('click', () => {
             location.reload();
+        });
+
+        // Download generated images
+        const downloadImagesBtn = document.getElementById('downloadImagesBtn');
+        downloadImagesBtn.addEventListener('click', async () => {
+            if (!state.generatedImages || state.generatedImages.length === 0) {
+                showError('No generated images available to download!');
+                return;
+            }
+
+            downloadImagesBtn.disabled = true;
+            downloadImagesBtn.innerHTML = '⏳ Preparing download...';
+
+            try {
+                const imageCount = state.generatedImages.length;
+                const videoTitle = state.videoTitle.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+
+                console.log(`📥 Downloading ${imageCount} generated images...`);
+
+                // Download each image sequentially
+                for (let i = 0; i < imageCount; i++) {
+                    const imageData = state.generatedImages[i];
+
+                    // Update button with progress
+                    downloadImagesBtn.innerHTML = `⏳ Downloading ${i + 1}/${imageCount}...`;
+
+                    // Handle both base64 and URL images
+                    let downloadUrl;
+                    let filename = `${videoTitle}-image-${String(i + 1).padStart(2, '0')}.png`;
+
+                    if (imageData.startsWith('data:image')) {
+                        // Base64 image - convert to blob
+                        const base64Data = imageData.split(',')[1];
+                        const binaryData = atob(base64Data);
+                        const bytes = new Uint8Array(binaryData.length);
+                        for (let j = 0; j < binaryData.length; j++) {
+                            bytes[j] = binaryData.charCodeAt(j);
+                        }
+                        const blob = new Blob([bytes], { type: 'image/png' });
+                        downloadUrl = URL.createObjectURL(blob);
+                    } else if (imageData.startsWith('http://') || imageData.startsWith('https://')) {
+                        // URL image - download via server proxy to avoid CORS
+                        try {
+                            const response = await fetch(imageData);
+                            const blob = await response.blob();
+                            downloadUrl = URL.createObjectURL(blob);
+                        } catch (error) {
+                            console.error(`Failed to download image ${i + 1}:`, error);
+                            continue; // Skip this image
+                        }
+                    } else {
+                        console.error(`Unknown image format for image ${i + 1}`);
+                        continue;
+                    }
+
+                    // Trigger download
+                    const link = document.createElement('a');
+                    link.href = downloadUrl;
+                    link.download = filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                    // Clean up blob URL
+                    if (downloadUrl.startsWith('blob:')) {
+                        setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+                    }
+
+                    // Small delay between downloads (browser doesn't block multiple downloads)
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                }
+
+                console.log(`✅ Downloaded ${imageCount} images successfully!`);
+                downloadImagesBtn.innerHTML = `✅ Downloaded ${imageCount} Images!`;
+
+                setTimeout(() => {
+                    downloadImagesBtn.disabled = false;
+                    downloadImagesBtn.innerHTML = '🖼️ Download Generated Images';
+                }, 2000);
+
+            } catch (error) {
+                console.error('❌ Image download error:', error);
+                showError(`Failed to download images: ${error.message}`);
+                downloadImagesBtn.disabled = false;
+                downloadImagesBtn.innerHTML = '🖼️ Download Generated Images';
+            }
         });
 
         // Thumbnail generation
