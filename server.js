@@ -1667,41 +1667,64 @@ app.post('/api/create-video', async (req, res) => {
     const audioPath = path.join(sessionDir, 'audio.mp3');
     await writeFile(audioPath, Buffer.from(audioData, 'base64'));
 
-    // CRITICAL: Verify actual audio duration using ffprobe
-    console.log('🔍 Verifying audio duration with ffprobe...');
+    // CRITICAL: Verify actual audio duration using ffprobe - THIS IS THE SOURCE OF TRUTH!
+    console.log('');
+    console.log('═══════════════════════════════════════════════════════════════');
+    console.log('🔍🔍🔍 VERIFYING AUDIO DURATION WITH FFPROBE (CRITICAL!) 🔍🔍🔍');
+    console.log('═══════════════════════════════════════════════════════════════');
     try {
       const { execSync } = require('child_process');
+      console.log(`📂 Audio file path: ${audioPath}`);
+      console.log(`⏳ Running ffprobe...`);
+
       const ffprobeOutput = execSync(`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${audioPath}"`, {
         encoding: 'utf8',
         timeout: 10000
       }).trim();
 
+      console.log(`📄 ffprobe raw output: "${ffprobeOutput}"`);
+
       const detectedDuration = Math.floor(parseFloat(ffprobeOutput));
 
       if (detectedDuration > 0 && !isNaN(detectedDuration)) {
+        console.log('');
         console.log(`📊 Frontend reported: ${actualAudioDuration}s (${(actualAudioDuration / 60).toFixed(1)} min)`);
-        console.log(`📊 ffprobe detected: ${detectedDuration}s (${(detectedDuration / 60).toFixed(1)} min)`);
+        console.log(`📊 ffprobe detected:  ${detectedDuration}s (${(detectedDuration / 60).toFixed(1)} min)`);
+        console.log(`📊 Difference: ${Math.abs(detectedDuration - actualAudioDuration)}s`);
+        console.log('');
 
-        if (Math.abs(detectedDuration - actualAudioDuration) > 60) {
-          console.warn(`⚠️ Duration mismatch > 60s! Using ffprobe value: ${detectedDuration}s`);
-        } else {
-          console.log(`✅ Using accurate ffprobe duration: ${detectedDuration}s`);
-        }
-
+        // ALWAYS use ffprobe value as source of truth!
         actualAudioDuration = detectedDuration;
+        console.log(`✅✅✅ USING FFPROBE AS SOURCE OF TRUTH: ${actualAudioDuration}s ✅✅✅`);
 
         // Recalculate adjusted interval with REAL audio duration
         adjustedInterval = actualAudioDuration / duplicatedImages.length;
-        console.log(`🔄 Recalculated interval: ${adjustedInterval.toFixed(1)}s per image`);
-        console.log(`📹 Total video duration will be: ${(adjustedInterval * duplicatedImages.length).toFixed(1)}s = ${actualAudioDuration}s ✅`);
+        console.log('');
+        console.log(`🔄 Interval per image: ${adjustedInterval.toFixed(2)}s per image`);
+        console.log(`📹 Total video duration: ${(adjustedInterval * duplicatedImages.length).toFixed(1)}s`);
+        console.log(`🎵 Total audio duration: ${actualAudioDuration}s`);
+        console.log(`✅ MATCH: ${(adjustedInterval * duplicatedImages.length).toFixed(1)}s = ${actualAudioDuration}s`);
+        console.log('');
 
       } else {
-        console.warn(`⚠️ Could not detect duration via ffprobe, using frontend value: ${actualAudioDuration}s`);
+        console.error(`❌❌❌ FFPROBE RETURNED INVALID DURATION: "${detectedDuration}"`);
+        console.error(`❌ Using frontend value: ${actualAudioDuration}s (THIS MAY CAUSE ISSUES!)`);
       }
     } catch (error) {
-      console.error('⚠️ ffprobe failed:', error.message);
-      console.log(`⚠️ Continuing with frontend duration: ${actualAudioDuration}s`);
+      console.error('❌❌❌ FFPROBE FAILED (CRITICAL ERROR!) ❌❌❌');
+      console.error('Error:', error.message);
+      console.error(`⚠️ Continuing with frontend duration: ${actualAudioDuration}s`);
+      console.error(`⚠️ THIS MAY CAUSE VIDEO/AUDIO SYNC ISSUES!`);
     }
+
+    console.log('═══════════════════════════════════════════════════════════════');
+    console.log(`📊 FINAL VALUES FOR VIDEO GENERATION:`);
+    console.log(`   - audioDuration: ${actualAudioDuration}s (${(actualAudioDuration / 60).toFixed(1)} min)`);
+    console.log(`   - adjustedInterval: ${adjustedInterval.toFixed(2)}s per image`);
+    console.log(`   - Total images: ${duplicatedImages.length}`);
+    console.log(`   - Expected video length: ${(adjustedInterval * duplicatedImages.length).toFixed(1)}s`);
+    console.log('═══════════════════════════════════════════════════════════════');
+    console.log('');
 
     // Download and save all images
     console.log('💾 Downloading and saving images...');
@@ -2138,49 +2161,72 @@ async function processVideoJob(jobId) {
     console.log(`✅ Decoded base64 audio to: ${audioPath}`);
   }
 
-  // CRITICAL: Verify actual audio duration using ffprobe
-  console.log('🔍 Verifying audio duration with ffprobe...');
+  // CRITICAL: Verify actual audio duration using ffprobe - THIS IS THE SOURCE OF TRUTH!
+  console.log('');
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('🔍🔍🔍 VERIFYING AUDIO DURATION WITH FFPROBE (CRITICAL!) 🔍🔍🔍');
+  console.log('═══════════════════════════════════════════════════════════════');
   let actualAudioDuration = audioDuration;
 
   try {
     const { execSync } = require('child_process');
+    console.log(`📂 Audio file path: ${audioPath}`);
+    console.log(`⏳ Running ffprobe...`);
+
     const ffprobeOutput = execSync(`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${audioPath}"`, {
       encoding: 'utf8',
       timeout: 10000
     }).trim();
 
+    console.log(`📄 ffprobe raw output: "${ffprobeOutput}"`);
+
     const detectedDuration = Math.floor(parseFloat(ffprobeOutput));
 
     if (detectedDuration > 0 && !isNaN(detectedDuration)) {
+      console.log('');
       console.log(`📊 Frontend reported: ${audioDuration}s (${(audioDuration / 60).toFixed(1)} min)`);
-      console.log(`📊 ffprobe detected: ${detectedDuration}s (${(detectedDuration / 60).toFixed(1)} min)`);
+      console.log(`📊 ffprobe detected:  ${detectedDuration}s (${(detectedDuration / 60).toFixed(1)} min)`);
+      console.log(`📊 Difference: ${Math.abs(detectedDuration - audioDuration)}s`);
+      console.log('');
 
-      if (Math.abs(detectedDuration - audioDuration) > 60) {
-        console.warn(`⚠️ Duration mismatch > 60s! Using ffprobe value: ${detectedDuration}s`);
-        actualAudioDuration = detectedDuration;
-      } else {
-        actualAudioDuration = detectedDuration;
-        console.log(`✅ Using accurate ffprobe duration: ${actualAudioDuration}s`);
-      }
+      // ALWAYS use ffprobe value as source of truth!
+      actualAudioDuration = detectedDuration;
+      console.log(`✅✅✅ USING FFPROBE AS SOURCE OF TRUTH: ${actualAudioDuration}s ✅✅✅`);
 
       // Recalculate adjusted interval with REAL audio duration
       const recalculatedInterval = actualAudioDuration / duplicatedImages.length;
-      console.log(`🔄 Recalculated interval: ${adjustedInterval.toFixed(1)}s -> ${recalculatedInterval.toFixed(1)}s per image`);
-      console.log(`📹 Total video duration will be: ${(recalculatedInterval * duplicatedImages.length).toFixed(1)}s = ${actualAudioDuration}s ✅`);
+      console.log('');
+      console.log(`🔄 Interval per image: ${adjustedInterval.toFixed(2)}s (old) -> ${recalculatedInterval.toFixed(2)}s (NEW)`);
+      console.log(`📹 Total video duration: ${(recalculatedInterval * duplicatedImages.length).toFixed(1)}s`);
+      console.log(`🎵 Total audio duration: ${actualAudioDuration}s`);
+      console.log(`✅ MATCH: ${(recalculatedInterval * duplicatedImages.length).toFixed(1)}s = ${actualAudioDuration}s`);
+      console.log('');
 
-      // Override the adjustedInterval with accurate value (using let, not const)
+      // Override the adjustedInterval with accurate value
       adjustedInterval = recalculatedInterval;
 
       // Also update audioDuration variable
       audioDuration = actualAudioDuration;
 
     } else {
-      console.warn(`⚠️ Could not detect duration via ffprobe, using frontend value: ${audioDuration}s`);
+      console.error(`❌❌❌ FFPROBE RETURNED INVALID DURATION: "${detectedDuration}"`);
+      console.error(`❌ Using frontend value: ${audioDuration}s (THIS MAY CAUSE ISSUES!)`);
     }
   } catch (error) {
-    console.error('⚠️ ffprobe failed:', error.message);
-    console.log(`⚠️ Continuing with frontend duration: ${audioDuration}s`);
+    console.error('❌❌❌ FFPROBE FAILED (CRITICAL ERROR!) ❌❌❌');
+    console.error('Error:', error.message);
+    console.error(`⚠️ Continuing with frontend duration: ${audioDuration}s`);
+    console.error(`⚠️ THIS MAY CAUSE VIDEO/AUDIO SYNC ISSUES!`);
   }
+
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log(`📊 FINAL VALUES FOR VIDEO GENERATION:`);
+  console.log(`   - audioDuration: ${audioDuration}s (${(audioDuration / 60).toFixed(1)} min)`);
+  console.log(`   - adjustedInterval: ${adjustedInterval.toFixed(2)}s per image`);
+  console.log(`   - Total images: ${duplicatedImages.length}`);
+  console.log(`   - Expected video length: ${(adjustedInterval * duplicatedImages.length).toFixed(1)}s`);
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('');
 
   updateJobStatus(jobId, { progress: 15 });
 

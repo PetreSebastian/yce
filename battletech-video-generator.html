@@ -1560,32 +1560,34 @@
                         await new Promise((resolve) => {
                             let resolved = false;
 
-                            // LONGER TIMEOUT for very long audio files (up to 60 minutes)
+                            // MUCH LONGER TIMEOUT for very long TTS audio (34+ minutes)
                             const timeout = setTimeout(() => {
                                 if (!resolved) {
-                                    console.error('⚠️ Audio metadata timeout after 30s');
+                                    console.error('⚠️⚠️⚠️ Audio metadata timeout after 90s - SERVER MUST USE FFPROBE!');
                                     // For TTS, estimate based on script length (very rough estimate)
                                     const estimatedDuration = Math.ceil(state.script.split(/\s+/).length / 2.5); // ~2.5 words per second
                                     state.audioDuration = estimatedDuration;
-                                    console.warn(`⚠️ Using estimated duration: ${state.audioDuration}s (${(state.audioDuration / 60).toFixed(1)} min)`);
+                                    console.warn(`⚠️ ESTIMATED DURATION: ${state.audioDuration}s (${(state.audioDuration / 60).toFixed(1)} min) from ${state.script.split(/\s+/).length} words`);
+                                    console.warn(`⚠️ THIS MAY BE WRONG! Server will use ffprobe to detect real duration!`);
                                     resolved = true;
                                     resolve();
                                 }
-                            }, 30000); // 30 second timeout
+                            }, 90000); // 90 second timeout (was 30s - too short!)
 
                             audio.onloadedmetadata = () => {
                                 if (!resolved) {
                                     clearTimeout(timeout);
                                     state.audioDuration = Math.floor(audio.duration);
-                                    console.log(`✅ Audio duration detected: ${state.audioDuration}s (${(state.audioDuration / 60).toFixed(1)} min)`);
+                                    console.log(`✅✅✅ REAL AUDIO DURATION DETECTED: ${state.audioDuration}s (${(state.audioDuration / 60).toFixed(1)} min) ✅✅✅`);
+                                    console.log(`📊 Sending to server: audioDuration = ${state.audioDuration} seconds`);
 
                                     // VALIDATION: Check if duration makes sense
                                     if (state.audioDuration <= 0 || isNaN(state.audioDuration)) {
-                                        console.error(`⚠️ Invalid audio duration: ${state.audioDuration}`);
+                                        console.error(`❌❌❌ INVALID audio duration: ${state.audioDuration}`);
                                         // Estimate from script
                                         const estimatedDuration = Math.ceil(state.script.split(/\s+/).length / 2.5);
                                         state.audioDuration = estimatedDuration;
-                                        console.warn(`⚠️ Using estimated duration: ${state.audioDuration}s`);
+                                        console.warn(`⚠️ Using estimated duration: ${state.audioDuration}s (${(state.audioDuration / 60).toFixed(1)} min)`);
                                     }
 
                                     resolved = true;
