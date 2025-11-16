@@ -1070,19 +1070,67 @@
 
             // Read file as base64
             const reader = new FileReader();
-            reader.onload = (event) => {
+            reader.onload = async (event) => {
                 state.uploadedAudioFile = event.target.result;
                 state.audioBase64 = event.target.result;
 
-                // Get audio duration
+                // Get audio duration with robust error handling
                 const audio = new Audio();
                 audio.src = state.audioBase64;
-                audio.onloadedmetadata = () => {
-                    state.audioDuration = Math.floor(audio.duration);
-                    audioFileNameText.textContent = `${file.name} (${state.audioDuration}s)`;
-                    audioFileName.classList.remove('hidden');
-                    validateForm();
-                };
+
+                await new Promise((resolve) => {
+                    let resolved = false;
+
+                    // 30 second timeout
+                    const timeout = setTimeout(() => {
+                        if (!resolved) {
+                            console.warn('⚠️ Audio metadata timeout, estimating from file size');
+                            const estimated = Math.ceil(file.size / 16000);
+                            state.audioDuration = estimated;
+                            audioFileNameText.textContent = `${file.name} (~${state.audioDuration}s estimated)`;
+                            audioFileName.classList.remove('hidden');
+                            validateForm();
+                            resolved = true;
+                            resolve();
+                        }
+                    }, 30000);
+
+                    audio.onloadedmetadata = () => {
+                        if (!resolved) {
+                            clearTimeout(timeout);
+                            state.audioDuration = Math.floor(audio.duration);
+                            console.log(`✅ Audio loaded: ${state.audioDuration}s (${(state.audioDuration / 60).toFixed(1)} min)`);
+
+                            // Validation
+                            if (state.audioDuration <= 0 || isNaN(state.audioDuration)) {
+                                console.warn('⚠️ Invalid duration, using file size estimate');
+                                state.audioDuration = Math.ceil(file.size / 16000);
+                            }
+
+                            audioFileNameText.textContent = `${file.name} (${state.audioDuration}s / ${(state.audioDuration / 60).toFixed(1)} min)`;
+                            audioFileName.classList.remove('hidden');
+                            validateForm();
+                            resolved = true;
+                            resolve();
+                        }
+                    };
+
+                    audio.onerror = () => {
+                        if (!resolved) {
+                            clearTimeout(timeout);
+                            console.warn('⚠️ Audio error, estimating from file size');
+                            state.audioDuration = Math.ceil(file.size / 16000);
+                            audioFileNameText.textContent = `${file.name} (~${state.audioDuration}s estimated)`;
+                            audioFileName.classList.remove('hidden');
+                            validateForm();
+                            resolved = true;
+                            resolve();
+                        }
+                    };
+
+                    // Force load
+                    audio.load();
+                });
             };
             reader.readAsDataURL(file);
         });
@@ -1407,15 +1455,56 @@
                         const audioUrl = URL.createObjectURL(audioFile);
                         state.audioBase64 = audioUrl;
 
-                        // Get actual audio duration
+                        // Get actual audio duration with timeout handling
                         const audio = new Audio();
                         audio.src = audioUrl;
                         await new Promise((resolve) => {
+                            let resolved = false;
+
+                            // 30 second timeout for very long audio files
+                            const timeout = setTimeout(() => {
+                                if (!resolved) {
+                                    console.error('⚠️ Uploaded audio metadata timeout after 30s');
+                                    // Use file size to estimate (rough: 128kbps = 16KB/s)
+                                    const estimatedDuration = Math.ceil(audioFile.size / 16000);
+                                    state.audioDuration = estimatedDuration;
+                                    console.warn(`⚠️ Estimated duration from file size: ${state.audioDuration}s (${(state.audioDuration / 60).toFixed(1)} min)`);
+                                    resolved = true;
+                                    resolve();
+                                }
+                            }, 30000);
+
                             audio.onloadedmetadata = () => {
-                                state.audioDuration = Math.floor(audio.duration);
-                                console.log(`🎵 Audio duration: ${state.audioDuration} seconds`);
-                                resolve();
+                                if (!resolved) {
+                                    clearTimeout(timeout);
+                                    state.audioDuration = Math.floor(audio.duration);
+                                    console.log(`🎵 Audio duration detected: ${state.audioDuration} seconds (${(state.audioDuration / 60).toFixed(1)} min)`);
+
+                                    // Validation
+                                    if (state.audioDuration <= 0 || isNaN(state.audioDuration)) {
+                                        console.error(`⚠️ Invalid duration: ${state.audioDuration}`);
+                                        state.audioDuration = Math.ceil(audioFile.size / 16000);
+                                        console.warn(`⚠️ Using file size estimate: ${state.audioDuration}s`);
+                                    }
+
+                                    resolved = true;
+                                    resolve();
+                                }
                             };
+
+                            audio.onerror = () => {
+                                if (!resolved) {
+                                    clearTimeout(timeout);
+                                    console.error('⚠️ Audio metadata error');
+                                    state.audioDuration = Math.ceil(audioFile.size / 16000);
+                                    console.warn(`⚠️ Using file size estimate: ${state.audioDuration}s`);
+                                    resolved = true;
+                                    resolve();
+                                }
+                            };
+
+                            // Force load
+                            audio.load();
                         });
                     } else {
                         // Fallback for long audio
@@ -1469,16 +1558,56 @@
                         audio.src = audioSrc;
 
                         await new Promise((resolve) => {
+                            let resolved = false;
+
+                            // LONGER TIMEOUT for very long audio files (up to 60 minutes)
+                            const timeout = setTimeout(() => {
+                                if (!resolved) {
+                                    console.error('⚠️ Audio metadata timeout after 30s');
+                                    // For TTS, estimate based on script length (very rough estimate)
+                                    const estimatedDuration = Math.ceil(state.script.split(/\s+/).length / 2.5); // ~2.5 words per second
+                                    state.audioDuration = estimatedDuration;
+                                    console.warn(`⚠️ Using estimated duration: ${state.audioDuration}s (${(state.audioDuration / 60).toFixed(1)} min)`);
+                                    resolved = true;
+                                    resolve();
+                                }
+                            }, 30000); // 30 second timeout
+
                             audio.onloadedmetadata = () => {
-                                state.audioDuration = Math.floor(audio.duration);
-                                console.log(`✅ Audio duration detected: ${state.audioDuration}s (${(state.audioDuration / 60).toFixed(1)} min)`);
-                                resolve();
+                                if (!resolved) {
+                                    clearTimeout(timeout);
+                                    state.audioDuration = Math.floor(audio.duration);
+                                    console.log(`✅ Audio duration detected: ${state.audioDuration}s (${(state.audioDuration / 60).toFixed(1)} min)`);
+
+                                    // VALIDATION: Check if duration makes sense
+                                    if (state.audioDuration <= 0 || isNaN(state.audioDuration)) {
+                                        console.error(`⚠️ Invalid audio duration: ${state.audioDuration}`);
+                                        // Estimate from script
+                                        const estimatedDuration = Math.ceil(state.script.split(/\s+/).length / 2.5);
+                                        state.audioDuration = estimatedDuration;
+                                        console.warn(`⚠️ Using estimated duration: ${state.audioDuration}s`);
+                                    }
+
+                                    resolved = true;
+                                    resolve();
+                                }
                             };
+
                             audio.onerror = () => {
-                                console.error('⚠️ Could not detect audio duration, using 120s fallback');
-                                state.audioDuration = 120;
-                                resolve();
+                                if (!resolved) {
+                                    clearTimeout(timeout);
+                                    console.error('⚠️ Audio metadata load error');
+                                    // Estimate from script length
+                                    const estimatedDuration = Math.ceil(state.script.split(/\s+/).length / 2.5);
+                                    state.audioDuration = estimatedDuration;
+                                    console.warn(`⚠️ Using estimated duration: ${state.audioDuration}s (${(state.audioDuration / 60).toFixed(1)} min)`);
+                                    resolved = true;
+                                    resolve();
+                                }
                             };
+
+                            // Force load to trigger metadata
+                            audio.load();
                         });
 
                         updateStepStatus('voiceover', 'complete');

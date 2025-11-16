@@ -1636,15 +1636,16 @@ app.post('/api/create-video', async (req, res) => {
     const originalCount = images.length;
     const duplicatedImages = [...images, ...images]; // x2 duplication
 
-    // CRITICAL: Adjust interval so total duration = audio duration
-    const adjustedInterval = audioDuration / duplicatedImages.length;
+    // CRITICAL: Adjust interval so total duration = audio duration (will be recalculated after ffprobe)
+    let adjustedInterval = audioDuration / duplicatedImages.length;
+    let actualAudioDuration = audioDuration;
 
     console.log(`🔄 Image distribution:`);
     console.log(`   Original: ${originalCount} images`);
     console.log(`   Duplicated: ${duplicatedImages.length} images`);
-    console.log(`   Audio duration: ${audioDuration}s (${(audioDuration / 60).toFixed(1)} min)`);
-    console.log(`   Interval per image: ${adjustedInterval.toFixed(1)}s (was ${imageInterval}s)`);
-    console.log(`   Total video duration: ${adjustedInterval * duplicatedImages.length}s = ${audioDuration}s ✅`);
+    console.log(`   Audio duration (frontend): ${audioDuration}s (${(audioDuration / 60).toFixed(1)} min)`);
+    console.log(`   Interval per image (initial): ${adjustedInterval.toFixed(1)}s (was ${imageInterval}s)`);
+    console.log(`   Total video duration (initial): ${adjustedInterval * duplicatedImages.length}s = ${audioDuration}s`);
 
     // Also duplicate effects array to match
     const originalEffects = imageEffects || [];
@@ -1665,6 +1666,42 @@ app.post('/api/create-video', async (req, res) => {
     const audioData = audioBase64.replace(/^data:audio\/\w+;base64,/, '');
     const audioPath = path.join(sessionDir, 'audio.mp3');
     await writeFile(audioPath, Buffer.from(audioData, 'base64'));
+
+    // CRITICAL: Verify actual audio duration using ffprobe
+    console.log('🔍 Verifying audio duration with ffprobe...');
+    try {
+      const { execSync } = require('child_process');
+      const ffprobeOutput = execSync(`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${audioPath}"`, {
+        encoding: 'utf8',
+        timeout: 10000
+      }).trim();
+
+      const detectedDuration = Math.floor(parseFloat(ffprobeOutput));
+
+      if (detectedDuration > 0 && !isNaN(detectedDuration)) {
+        console.log(`📊 Frontend reported: ${actualAudioDuration}s (${(actualAudioDuration / 60).toFixed(1)} min)`);
+        console.log(`📊 ffprobe detected: ${detectedDuration}s (${(detectedDuration / 60).toFixed(1)} min)`);
+
+        if (Math.abs(detectedDuration - actualAudioDuration) > 60) {
+          console.warn(`⚠️ Duration mismatch > 60s! Using ffprobe value: ${detectedDuration}s`);
+        } else {
+          console.log(`✅ Using accurate ffprobe duration: ${detectedDuration}s`);
+        }
+
+        actualAudioDuration = detectedDuration;
+
+        // Recalculate adjusted interval with REAL audio duration
+        adjustedInterval = actualAudioDuration / duplicatedImages.length;
+        console.log(`🔄 Recalculated interval: ${adjustedInterval.toFixed(1)}s per image`);
+        console.log(`📹 Total video duration will be: ${(adjustedInterval * duplicatedImages.length).toFixed(1)}s = ${actualAudioDuration}s ✅`);
+
+      } else {
+        console.warn(`⚠️ Could not detect duration via ffprobe, using frontend value: ${actualAudioDuration}s`);
+      }
+    } catch (error) {
+      console.error('⚠️ ffprobe failed:', error.message);
+      console.log(`⚠️ Continuing with frontend duration: ${actualAudioDuration}s`);
+    }
 
     // Download and save all images
     console.log('💾 Downloading and saving images...');
@@ -2063,14 +2100,14 @@ async function processVideoJob(jobId) {
   const originalCount = images.length;
   const duplicatedImages = [...images, ...images]; // x2 duplication
 
-  // CRITICAL: Adjust interval so total duration = audio duration
-  const adjustedInterval = audioDuration / duplicatedImages.length;
+  // CRITICAL: Adjust interval so total duration = audio duration (will be recalculated after ffprobe)
+  let adjustedInterval = audioDuration / duplicatedImages.length;
 
   console.log(`🔄 Image distribution:`);
   console.log(`   Original: ${originalCount} images`);
   console.log(`   Duplicated: ${duplicatedImages.length} images`);
-  console.log(`   Audio duration: ${audioDuration}s`);
-  console.log(`   Interval per image: ${adjustedInterval.toFixed(1)}s (was ${imageInterval}s)`);
+  console.log(`   Audio duration (frontend): ${audioDuration}s`);
+  console.log(`   Interval per image (initial): ${adjustedInterval.toFixed(1)}s (was ${imageInterval}s)`);
 
   // Also duplicate effects array to match
   const originalEffects = imageEffects || [];
@@ -2099,6 +2136,50 @@ async function processVideoJob(jobId) {
     audioPath = path.join(sessionDir, 'audio.mp3');
     await writeFile(audioPath, Buffer.from(audioData, 'base64'));
     console.log(`✅ Decoded base64 audio to: ${audioPath}`);
+  }
+
+  // CRITICAL: Verify actual audio duration using ffprobe
+  console.log('🔍 Verifying audio duration with ffprobe...');
+  let actualAudioDuration = audioDuration;
+
+  try {
+    const { execSync } = require('child_process');
+    const ffprobeOutput = execSync(`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${audioPath}"`, {
+      encoding: 'utf8',
+      timeout: 10000
+    }).trim();
+
+    const detectedDuration = Math.floor(parseFloat(ffprobeOutput));
+
+    if (detectedDuration > 0 && !isNaN(detectedDuration)) {
+      console.log(`📊 Frontend reported: ${audioDuration}s (${(audioDuration / 60).toFixed(1)} min)`);
+      console.log(`📊 ffprobe detected: ${detectedDuration}s (${(detectedDuration / 60).toFixed(1)} min)`);
+
+      if (Math.abs(detectedDuration - audioDuration) > 60) {
+        console.warn(`⚠️ Duration mismatch > 60s! Using ffprobe value: ${detectedDuration}s`);
+        actualAudioDuration = detectedDuration;
+      } else {
+        actualAudioDuration = detectedDuration;
+        console.log(`✅ Using accurate ffprobe duration: ${actualAudioDuration}s`);
+      }
+
+      // Recalculate adjusted interval with REAL audio duration
+      const recalculatedInterval = actualAudioDuration / duplicatedImages.length;
+      console.log(`🔄 Recalculated interval: ${adjustedInterval.toFixed(1)}s -> ${recalculatedInterval.toFixed(1)}s per image`);
+      console.log(`📹 Total video duration will be: ${(recalculatedInterval * duplicatedImages.length).toFixed(1)}s = ${actualAudioDuration}s ✅`);
+
+      // Override the adjustedInterval with accurate value (using let, not const)
+      adjustedInterval = recalculatedInterval;
+
+      // Also update audioDuration variable
+      audioDuration = actualAudioDuration;
+
+    } else {
+      console.warn(`⚠️ Could not detect duration via ffprobe, using frontend value: ${audioDuration}s`);
+    }
+  } catch (error) {
+    console.error('⚠️ ffprobe failed:', error.message);
+    console.log(`⚠️ Continuing with frontend duration: ${audioDuration}s`);
   }
 
   updateJobStatus(jobId, { progress: 15 });
