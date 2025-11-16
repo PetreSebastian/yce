@@ -2197,23 +2197,26 @@ async function processVideoJob(jobId) {
   // Save audio file (support both file paths and base64)
   console.log('💾 Preparing audio file...');
   let audioPath;
+  let isTTSGenerated = false;
 
   if (audioBase64.startsWith('/temp/')) {
     // Audio is already uploaded as file - use it directly
     audioPath = path.join(__dirname, audioBase64);
     console.log(`✅ Using uploaded audio file: ${audioBase64}`);
+    isTTSGenerated = false;
   } else {
-    // Audio is base64 - decode and save
+    // Audio is base64 - this is TTS-generated audio
     const audioData = audioBase64.replace(/^data:audio\/\w+;base64,/, '');
     audioPath = path.join(sessionDir, 'audio.mp3');
     await writeFile(audioPath, Buffer.from(audioData, 'base64'));
     console.log(`✅ Decoded base64 audio to: ${audioPath}`);
+    isTTSGenerated = true;
   }
 
-  // CRITICAL: Verify actual audio duration using ffprobe - THIS IS THE SOURCE OF TRUTH!
+  // CRITICAL: Verify actual audio duration
   console.log('');
   console.log('═══════════════════════════════════════════════════════════════');
-  console.log('🔍🔍🔍 VERIFYING AUDIO DURATION WITH FFPROBE (CRITICAL!) 🔍🔍🔍');
+  console.log('🔍🔍🔍 VERIFYING AUDIO DURATION 🔍🔍🔍');
   console.log('═══════════════════════════════════════════════════════════════');
   let actualAudioDuration = audioDuration;
 
@@ -2222,9 +2225,33 @@ async function processVideoJob(jobId) {
   let logContent = `\n\n═══ FFPROBE DEBUG LOG - ${new Date().toISOString()} ═══\n`;
   logContent += `Job ID: ${jobId}\n`;
   logContent += `Audio path: ${audioPath}\n`;
+  logContent += `Is TTS generated: ${isTTSGenerated}\n`;
   logContent += `Frontend reported duration: ${audioDuration}s (${(audioDuration / 60).toFixed(1)} min)\n`;
   logContent += `Total images: ${duplicatedImages.length}\n`;
   logContent += `Initial interval: ${adjustedInterval.toFixed(2)}s per image\n\n`;
+
+  // SKIP ffprobe for TTS-generated audio (VBR MP3 with missing Xing header)
+  if (isTTSGenerated) {
+    console.log('🎙️ TTS-generated audio detected - TRUSTING frontend duration');
+    console.log(`✅✅✅ USING FRONTEND DURATION: ${audioDuration}s (${(audioDuration / 60).toFixed(1)} min)`);
+    console.log('📝 Reason: TTS MP3s are VBR without Xing header, ffprobe cannot read duration correctly');
+
+    logContent += `🎙️ TTS-generated audio - skipping ffprobe\n`;
+    logContent += `✅ USING FRONTEND: ${audioDuration}s (${(audioDuration / 60).toFixed(1)} min)\n`;
+    logContent += `Reason: TTS VBR MP3 - ffprobe unreliable\n\n`;
+
+    actualAudioDuration = audioDuration; // Trust frontend for TTS
+
+    // Recalculate interval
+    const recalculatedInterval = actualAudioDuration / duplicatedImages.length;
+    adjustedInterval = recalculatedInterval;
+
+    logContent += `Recalculated interval: ${adjustedInterval.toFixed(4)}s per image\n`;
+    logContent += `Expected video length: ${(adjustedInterval * duplicatedImages.length).toFixed(1)}s\n\n`;
+  } else {
+    // Uploaded audio file - verify with ffprobe
+    console.log('📤 Uploaded audio file - verifying with ffprobe...');
+    logContent += `📤 Uploaded audio - running ffprobe...\n`;
 
   try {
     const { execSync } = require('child_process');
@@ -2340,6 +2367,8 @@ async function processVideoJob(jobId) {
     logContent += `Using frontend duration: ${audioDuration}s\n`;
     actualAudioDuration = audioDuration; // Fallback to frontend on error
   }
+
+  } // End of uploaded audio file ffprobe check
 
   console.log('═══════════════════════════════════════════════════════════════');
   console.log(`📊 FINAL VALUES FOR VIDEO GENERATION:`);
