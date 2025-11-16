@@ -2206,16 +2206,38 @@ async function processVideoJob(jobId) {
     console.log(`⏳ Running ffprobe...`);
     logContent += `Running ffprobe...\n`;
 
-    const ffprobeOutput = execSync(`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${audioPath}"`, {
+    // CRITICAL FIX: Read audio STREAM duration, not container format duration!
+    // Some files have wrong container metadata but correct stream metadata
+    const ffprobeOutput = execSync(`ffprobe -v error -select_streams a:0 -show_entries stream=duration -of default=noprint_wrappers=1:nokey=1 "${audioPath}"`, {
       encoding: 'utf8',
       timeout: 10000
     }).trim();
 
+    // Fallback: If stream duration is N/A, try format duration
+    let fallbackDuration = null;
+    if (!ffprobeOutput || ffprobeOutput === 'N/A' || isNaN(parseFloat(ffprobeOutput))) {
+      console.log('⚠️ Stream duration not available, trying format duration...');
+      logContent += `⚠️ Stream duration not available, trying format duration...\n`;
+
+      const formatOutput = execSync(`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${audioPath}"`, {
+        encoding: 'utf8',
+        timeout: 10000
+      }).trim();
+
+      fallbackDuration = parseFloat(formatOutput);
+      console.log(`📄 Format duration: "${formatOutput}"`);
+      logContent += `Format duration fallback: "${formatOutput}"\n`;
+    }
+
     console.log(`📄 ffprobe raw output: "${ffprobeOutput}"`);
     logContent += `ffprobe raw output: "${ffprobeOutput}"\n`;
 
-    const detectedDuration = Math.floor(parseFloat(ffprobeOutput));
-    logContent += `Parsed duration: ${detectedDuration}s\n`;
+    // Use stream duration first, fallback to format duration if needed
+    const detectedDuration = fallbackDuration !== null
+      ? Math.floor(fallbackDuration)
+      : Math.floor(parseFloat(ffprobeOutput));
+
+    logContent += `Parsed duration: ${detectedDuration}s${fallbackDuration !== null ? ' (from format fallback)' : ' (from stream)'}\n`;
 
     if (detectedDuration > 0 && !isNaN(detectedDuration)) {
       console.log('');
@@ -2470,11 +2492,11 @@ async function processVideoJob(jobId) {
     particlesFilePath = path.join(__dirname, particlesPath);
     console.log(`✨ Particles video found: ${particlesPath}`);
 
-    // Get particles duration with ffprobe
+    // Get particles duration with ffprobe (use VIDEO stream duration for accuracy)
     try {
       const { execSync } = require('child_process');
       const particlesProbeOutput = execSync(
-        `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${particlesFilePath}"`,
+        `ffprobe -v error -select_streams v:0 -show_entries stream=duration -of default=noprint_wrappers=1:nokey=1 "${particlesFilePath}"`,
         { encoding: 'utf8', timeout: 10000 }
       ).trim();
 
