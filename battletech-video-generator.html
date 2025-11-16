@@ -1138,13 +1138,14 @@
             document.getElementById('thumbnailPreview').classList.add('hidden');
 
             try {
-                // Parse script to get first scene
+                // Parse script to get thumbnail prompt with TITLE + full summary
                 const parseResponse = await fetch(`${API_BASE_URL}/api/parse-script`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         script: state.script,
-                        targetImageCount: 1 // Just 1 image for thumbnail
+                        targetImageCount: 1, // Just 1 image for thumbnail
+                        title: state.videoTitle // Pass title for unique thumbnails
                     })
                 });
 

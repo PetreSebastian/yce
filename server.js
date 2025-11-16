@@ -297,27 +297,36 @@ function parseScriptForScenes(scriptText) {
 }
 
 // Convert scene descriptions to EC Comics horror style image prompts
-function convertToImagePrompts(sceneDescriptions, isThumbnail = false) {
+function convertToImagePrompts(sceneDescriptions, isThumbnail = false, thumbnailData = null) {
   return sceneDescriptions.map((scene, index) => {
-    // Extract key visual elements and keep prompt concise
-    let basePrompt = scene.replace(/["""]/g, '').trim();
+    // For thumbnails, use title + full summary instead of scene snippet
+    let basePrompt;
 
-    // Shorten if too long (keep under 200 chars for the base description)
-    if (basePrompt.length > 200) {
-      // Extract most visually descriptive parts
-      const sentences = basePrompt.split(/[.!?]+/).filter(s => s.trim());
+    if (isThumbnail && thumbnailData) {
+      // Use TITLE + comprehensive story summary for unique thumbnails
+      basePrompt = `"${thumbnailData.title}" - ${thumbnailData.summary}`;
+      console.log(`🎨 Thumbnail basePrompt (${basePrompt.length} chars): ${basePrompt.substring(0, 100)}...`);
+    } else {
+      // Regular video frames: Extract key visual elements and keep prompt concise
+      basePrompt = scene.replace(/["""]/g, '').trim();
 
-      // Prioritize sentences with visual keywords
-      const visualKeywords = /'Mech|Atlas|Marauder|cockpit|bay|reactor|lights|shadows|armor|industrial|maintenance|mechanical|laser|PPC/i;
+      // Shorten if too long (keep under 200 chars for the base description)
+      if (basePrompt.length > 200) {
+        // Extract most visually descriptive parts
+        const sentences = basePrompt.split(/[.!?]+/).filter(s => s.trim());
 
-      const visualSentences = sentences.filter(s => visualKeywords.test(s));
-      basePrompt = visualSentences.length > 0
-        ? visualSentences.slice(0, 2).join('. ')
-        : sentences.slice(0, 2).join('. ');
+        // Prioritize sentences with visual keywords
+        const visualKeywords = /'Mech|Atlas|Marauder|cockpit|bay|reactor|lights|shadows|armor|industrial|maintenance|mechanical|laser|PPC/i;
 
-      // Still too long? Take first 150 chars
-      if (basePrompt.length > 150) {
-        basePrompt = basePrompt.substring(0, 150) + '...';
+        const visualSentences = sentences.filter(s => visualKeywords.test(s));
+        basePrompt = visualSentences.length > 0
+          ? visualSentences.slice(0, 2).join('. ')
+          : sentences.slice(0, 2).join('. ');
+
+        // Still too long? Take first 150 chars
+        if (basePrompt.length > 150) {
+          basePrompt = basePrompt.substring(0, 150) + '...';
+        }
       }
     }
 
@@ -633,6 +642,20 @@ app.post('/api/generate-script', async (req, res) => {
     let generatedScript = '';
     let totalWords = 0;
 
+    // Random opening variations to prevent repetitive beginnings
+    const openingStyles = [
+      'Start with the protagonist arriving at a location',
+      'Start with the protagonist already in the middle of a tense situation',
+      'Start with the protagonist receiving an assignment or mission briefing',
+      'Start with the protagonist doing routine maintenance or inspection',
+      'Start with the protagonist investigating something unusual or suspicious',
+      'Start with the protagonist waking up or starting their shift',
+      'Start with dialogue or communication between the protagonist and command'
+    ];
+
+    const randomOpening = openingStyles[Math.floor(Math.random() * openingStyles.length)];
+    console.log(`🎲 Random opening style: ${randomOpening}`);
+
     // SECTION 1: Opening
     console.log(`\n📖 Section 1/${numSections} - Opening (${wordsPerSection} words)...`);
 
@@ -640,11 +663,14 @@ app.post('/api/generate-script', async (req, res) => {
 
 Write EXACTLY ${wordsPerSection} words.
 
-- First-person (MechWarrior/technician)
+- First-person perspective
+- MALE protagonist (MechWarrior or technician, always male character)
 - EC Comics horror style
+- ${randomOpening}
 - Introduce setting, character, situation
 - Visual, atmospheric descriptions
 - Do NOT include the title in the story text
+- The protagonist must be MALE (he/him)
 
 ${wordsPerSection} words. Start directly with the story:`;
 
@@ -1486,7 +1512,7 @@ app.post('/api/parse-script', async (req, res) => {
   console.log('\n📄 Script parsing request received...');
 
   try {
-    let { script, targetImageCount } = req.body;
+    let { script, targetImageCount, title } = req.body;
 
     if (!script) {
       return res.status(400).json({ error: 'Script is required' });
@@ -1543,8 +1569,29 @@ app.post('/api/parse-script', async (req, res) => {
     // Detect if this is a thumbnail request (single image)
     const isThumbnail = targetImageCount === 1;
 
+    // For thumbnails, create a comprehensive summary from the entire script + title
+    let thumbnailData = null;
+    if (isThumbnail) {
+      // Extract key plot points from the script (first 2000 chars to get main story beats)
+      const scriptSample = script.substring(0, 2000);
+
+      // Create a summary including title and story essence
+      const storySummary = scriptSample
+        .replace(/\n+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .substring(0, 500); // Take first 500 chars of actual story
+
+      thumbnailData = {
+        title: title || 'Untitled BattleTech Horror',
+        summary: storySummary
+      };
+
+      console.log(`🖼️ THUMBNAIL MODE - Title: "${thumbnailData.title}", Summary: ${thumbnailData.summary.length} chars`);
+    }
+
     // Convert to image prompts (thumbnail gets special Warhammer-style treatment)
-    const imagePrompts = convertToImagePrompts(sceneDescriptions, isThumbnail);
+    const imagePrompts = convertToImagePrompts(sceneDescriptions, isThumbnail, thumbnailData);
 
     console.log(`✅ Generated ${imagePrompts.length} image prompts${isThumbnail ? ' (THUMBNAIL MODE - Warhammer style)' : ' (EC Comics style)'}`);
 
