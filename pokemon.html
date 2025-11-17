@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Boring Facts - Complete Pokémon Video Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen p-6" style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 mb-8">
+            <h1 class="text-5xl font-bold text-center mb-4">
+                <span class="bg-gradient-to-r from-yellow-400 via-red-500 to-blue-600 bg-clip-text text-transparent">
+                    😴 Boring Facts - Pokémon Video Generator
+                </span>
+            </h1>
+            <p class="text-center text-gray-600 text-lg">
+                Complete Automation: Script + Images + Voice + Description + Tags + Video 🎬
+            </p>
+        </div>
+
+        <!-- Main Content -->
+        <div class="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8">
+
+            <!-- Video Title -->
+            <div class="mb-8">
+                <label class="block text-2xl font-bold text-gray-800 mb-3">🎯 Video Title</label>
+                <input
+                    type="text"
+                    id="videoTitle"
+                    placeholder="e.g., The Secret Origins of Mewtwo"
+                    class="w-full p-4 border-2 border-yellow-400 rounded-lg text-lg"
+                />
+            </div>
+
+            <!-- Word Count -->
+            <div class="mb-8">
+                <label class="block text-xl font-bold text-gray-800 mb-3">📝 Script Word Count</label>
+                <div class="flex items-center gap-4">
+                    <input type="range" id="wordCountSlider" min="500" max="10000" step="100" value="2000" class="flex-1" />
+                    <span id="wordCountDisplay" class="text-2xl font-bold text-blue-600 min-w-[120px]">2,000</span>
+                    <span class="text-gray-600">words</span>
+                </div>
+            </div>
+
+            <!-- Image Count -->
+            <div class="mb-8">
+                <label class="block text-xl font-bold text-gray-800 mb-3">🖼️ Number of Images</label>
+                <div class="flex items-center gap-4">
+                    <input type="range" id="imageCountSlider" min="5" max="20" step="1" value="10" class="flex-1" />
+                    <span id="imageCountDisplay" class="text-2xl font-bold text-purple-600 min-w-[80px]">10</span>
+                    <span class="text-gray-600">images</span>
+                </div>
+            </div>
+
+            <!-- Image Provider -->
+            <div class="mb-8 p-6 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border-2 border-purple-400">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">🎨 Image Provider</h3>
+                <div class="space-y-3">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="radio" name="imageProvider" value="pollinations" checked class="w-5 h-5">
+                        <div>
+                            <span class="font-bold text-lg">⚡ Pollinations.ai (RECOMMENDED)</span>
+                            <p class="text-sm text-gray-600">100% FREE, No API key, High quality FLUX model!</p>
+                        </div>
+                    </label>
+                    <label class="flex items-center gap-3 cursor-pointer opacity-50">
+                        <input type="radio" name="imageProvider" value="gemini" disabled class="w-5 h-5">
+                        <div>
+                            <span class="font-bold text-lg">🌟 Google Gemini</span>
+                            <p class="text-sm text-gray-600">Currently unavailable - use Pollinations instead</p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Script Preview -->
+            <div id="scriptPreview" class="hidden mb-8 p-6 bg-gray-50 rounded-lg border-2 border-gray-300">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-xl font-bold text-gray-800">📜 Generated Script</h3>
+                    <button id="toggleScript" class="text-blue-600 hover:text-blue-800">Show/Hide</button>
+                </div>
+                <div id="scriptContent" class="hidden">
+                    <textarea id="scriptText" rows="8" class="w-full p-4 border-2 rounded-lg font-mono text-sm" readonly></textarea>
+                    <p class="text-sm text-gray-600 mt-2"><span id="scriptWordCount">0</span> words</p>
+                </div>
+            </div>
+
+            <!-- Description & Tags Preview -->
+            <div id="descriptionPreview" class="hidden mb-8 p-6 bg-blue-50 rounded-lg border-2 border-blue-300">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-xl font-bold text-gray-800">📋 YouTube Description & Tags</h3>
+                    <button id="toggleDescription" class="text-blue-600 hover:text-blue-800">Show/Hide</button>
+                </div>
+                <div id="descriptionContent" class="hidden space-y-4">
+                    <div>
+                        <h4 class="font-bold text-gray-700 mb-2">Description:</h4>
+                        <textarea id="descriptionText" rows="6" class="w-full p-4 border-2 rounded-lg text-sm" readonly></textarea>
+                        <button id="copyDescription" class="mt-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+                            📋 Copy Description
+                        </button>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-gray-700 mb-2">Tags:</h4>
+                        <textarea id="tagsText" rows="3" class="w-full p-4 border-2 rounded-lg text-sm" readonly></textarea>
+                        <button id="copyTags" class="mt-2 bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded">
+                            📋 Copy Tags
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Generate Button -->
+            <button id="generateBtn" class="w-full bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white font-bold py-6 px-8 rounded-xl text-2xl mb-4">
+                ⚡ GENERATE COMPLETE VIDEO
+            </button>
+
+            <p class="text-center text-sm text-gray-600 mb-8">
+                🎬 Generates: Script + Images + Voice + Description + Tags + Video (~5 min)
+            </p>
+
+            <!-- Progress -->
+            <div id="progressSection" class="hidden mt-8 p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border-2 border-blue-400">
+                <h3 class="text-2xl font-bold text-blue-800 mb-4">⚡ Generating...</h3>
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <p class="text-lg font-semibold text-gray-700" id="currentStep">Initializing...</p>
+                            <p class="text-lg font-bold text-blue-600"><span id="overallProgress">0%</span></p>
+                        </div>
+                        <div class="w-full bg-gray-300 rounded-full h-6">
+                            <div id="overallProgressBar" class="bg-gradient-to-r from-blue-500 to-purple-600 h-6 rounded-full transition-all" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-sm bg-white p-4 rounded-lg">
+                        <div id="step-script" class="flex items-center gap-2 text-gray-400">
+                            <span class="text-xl">⏸️</span> <span>Generate script</span>
+                        </div>
+                        <div id="step-prompts" class="flex items-center gap-2 text-gray-400">
+                            <span class="text-xl">⏸️</span> <span>Extract prompts</span>
+                        </div>
+                        <div id="step-images" class="flex items-center gap-2 text-gray-400">
+                            <span class="text-xl">⏸️</span> <span>Generate images (<span id="imageProgress">0/10</span>)</span>
+                        </div>
+                        <div id="step-voice" class="flex items-center gap-2 text-gray-400">
+                            <span class="text-xl">⏸️</span> <span>Generate voiceover</span>
+                        </div>
+                        <div id="step-description" class="flex items-center gap-2 text-gray-400">
+                            <span class="text-xl">⏸️</span> <span>Generate description & tags</span>
+                        </div>
+                        <div id="step-video" class="flex items-center gap-2 text-gray-400">
+                            <span class="text-xl">⏸️</span> <span>Create video</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Success -->
+            <div id="successSection" class="hidden mt-8 bg-gradient-to-r from-green-100 to-blue-100 border-4 border-green-500 p-8 rounded-xl">
+                <h3 class="text-3xl font-bold text-green-700 mb-4">✅ COMPLETE!</h3>
+                <div class="space-y-4">
+                    <video id="videoPreview" controls class="w-full rounded-lg shadow-lg"></video>
+                    <div class="grid grid-cols-2 gap-4">
+                        <a id="downloadLink" href="#" download class="inline-block bg-gradient-to-r from-green-500 to-blue-500 text-white font-bold py-4 px-6 rounded-lg text-center">
+                            ⬇️ DOWNLOAD VIDEO
+                        </a>
+                        <button id="newVideoBtn" class="bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-4 px-6 rounded-lg">
+                            🎬 NEW VIDEO
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4 mt-6 text-center">
+                        <div class="bg-white p-4 rounded-lg">
+                            <p class="text-2xl font-bold text-blue-600" id="finalWordCount">0</p>
+                            <p class="text-sm text-gray-600">Words</p>
+                        </div>
+                        <div class="bg-white p-4 rounded-lg">
+                            <p class="text-2xl font-bold text-purple-600" id="finalImageCount">0</p>
+                            <p class="text-sm text-gray-600">Images</p>
+                        </div>
+                        <div class="bg-white p-4 rounded-lg">
+                            <p class="text-2xl font-bold text-green-600" id="finalDuration">0:00</p>
+                            <p class="text-sm text-gray-600">Duration</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error -->
+            <div id="errorSection" class="hidden mt-8 bg-red-100 border-4 border-red-500 p-6 rounded-lg">
+                <h3 class="text-2xl font-bold text-red-700 mb-2">❌ Error</h3>
+                <p id="errorMessage" class="text-red-600"></p>
+                <button id="retryBtn" class="mt-4 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg">
+                    🔄 Try Again
+                </button>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-8 bg-white/90 rounded-xl p-6 text-center">
+            <p class="text-gray-600">
+                💡 <strong>Complete Package:</strong> Script + Images + Voice + Description + Tags + Video
+            </p>
+            <p class="text-sm text-gray-500 mt-2">
+                🎙️ ElevenLabs/OpenAI Voice | 🎨 Pollinations.ai (FREE) | 📝 Groq AI | 📋 YouTube SEO
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3000';
+
+        const state = {
+            videoTitle: '',
+            wordCount: 2000,
+            imageCount: 10,
+            imageProvider: 'pollinations',
+            script: '',
+            images: [],
+            audioPath: '',
+            description: '',
+            tags: ''
+        };
+
+        // Event Listeners
+        document.getElementById('videoTitle').addEventListener('input', (e) => {
+            state.videoTitle = e.target.value.trim();
+            updateGenerateButton();
+        });
+
+        document.getElementById('wordCountSlider').addEventListener('input', (e) => {
+            state.wordCount = parseInt(e.target.value);
+            document.getElementById('wordCountDisplay').textContent = state.wordCount.toLocaleString();
+        });
+
+        document.getElementById('imageCountSlider').addEventListener('input', (e) => {
+            state.imageCount = parseInt(e.target.value);
+            document.getElementById('imageCountDisplay').textContent = state.imageCount;
+        });
+
+        document.querySelectorAll('input[name="imageProvider"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                state.imageProvider = e.target.value;
+            });
+        });
+
+        document.getElementById('toggleScript').addEventListener('click', () => {
+            document.getElementById('scriptContent').classList.toggle('hidden');
+        });
+
+        document.getElementById('toggleDescription').addEventListener('click', () => {
+            document.getElementById('descriptionContent').classList.toggle('hidden');
+        });
+
+        document.getElementById('copyDescription').addEventListener('click', () => {
+            navigator.clipboard.writeText(state.description);
+            alert('Description copied!');
+        });
+
+        document.getElementById('copyTags').addEventListener('click', () => {
+            navigator.clipboard.writeText(state.tags);
+            alert('Tags copied!');
+        });
+
+        document.getElementById('newVideoBtn').addEventListener('click', () => {
+            location.reload();
+        });
+
+        document.getElementById('retryBtn').addEventListener('click', () => {
+            document.getElementById('errorSection').classList.add('hidden');
+            document.getElementById('generateBtn').disabled = false;
+        });
+
+        function updateGenerateButton() {
+            document.getElementById('generateBtn').disabled = state.videoTitle.length === 0;
+        }
+
+        function updateStep(stepId, status) {
+            const step = document.getElementById(stepId);
+            if (!step) return;
+            const icon = step.querySelector('.text-xl');
+            step.classList.remove('text-gray-400', 'text-blue-600', 'text-green-600');
+            if (status === 'active') {
+                icon.textContent = '⏳';
+                step.classList.add('text-blue-600');
+            } else if (status === 'done') {
+                icon.textContent = '✅';
+                step.classList.add('text-green-600');
+            }
+        }
+
+        function updateProgress(step, percent) {
+            document.getElementById('currentStep').textContent = step;
+            document.getElementById('overallProgress').textContent = `${percent}%`;
+            document.getElementById('overallProgressBar').style.width = `${percent}%`;
+        }
+
+        function showError(message) {
+            document.getElementById('errorSection').classList.remove('hidden');
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('progressSection').classList.add('hidden');
+            document.getElementById('generateBtn').disabled = false;
+        }
+
+        // Main generation
+        document.getElementById('generateBtn').addEventListener('click', async () => {
+            try {
+                document.getElementById('progressSection').classList.remove('hidden');
+                document.getElementById('successSection').classList.add('hidden');
+                document.getElementById('errorSection').classList.add('hidden');
+                document.getElementById('generateBtn').disabled = true;
+
+                updateProgress('Starting...', 0);
+
+                // 1. Script
+                updateStep('step-script', 'active');
+                updateProgress('📝 Generating script...', 5);
+
+                const scriptResponse = await fetch(`${API_BASE_URL}/api/generate-script`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: state.videoTitle, wordCount: state.wordCount })
+                });
+
+                if (!scriptResponse.ok) throw new Error('Script generation failed');
+                const scriptData = await scriptResponse.json();
+                state.script = scriptData.script;
+
+                document.getElementById('scriptPreview').classList.remove('hidden');
+                document.getElementById('scriptText').value = state.script;
+                document.getElementById('scriptWordCount').textContent = scriptData.actualWords.toLocaleString();
+
+                updateStep('step-script', 'done');
+                updateProgress('✅ Script done!', 10);
+
+                // 2. Prompts
+                updateStep('step-prompts', 'active');
+                updateProgress('🎨 Extracting prompts...', 15);
+
+                const promptsResponse = await fetch(`${API_BASE_URL}/api/extract-image-prompts`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ script: state.script, imageCount: state.imageCount })
+                });
+
+                if (!promptsResponse.ok) throw new Error('Prompt extraction failed');
+                const promptsData = await promptsResponse.json();
+
+                updateStep('step-prompts', 'done');
+                updateProgress('✅ Prompts done!', 20);
+
+                // 3. Images (Always use Pollinations)
+                updateStep('step-images', 'active');
+                updateProgress(`🖼️ Generating images...`, 25);
+
+                const imagesResponse = await fetch(`${API_BASE_URL}/api/generate-images-pollinations`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompts: promptsData.prompts })
+                });
+
+                if (!imagesResponse.ok) throw new Error('Image generation failed');
+                const imagesData = await imagesResponse.json();
+                state.images = imagesData.images.map(img => img.path);
+
+                if (state.images.length === 0) {
+                    throw new Error('No images were generated');
+                }
+
+                document.getElementById('imageProgress').textContent = `${state.images.length}/${state.imageCount}`;
+                updateStep('step-images', 'done');
+                updateProgress('✅ Images done!', 50);
+
+                // 4. Voice
+                updateStep('step-voice', 'active');
+                updateProgress('🎙️ Generating voice...', 55);
+
+                const voiceResponse = await fetch(`${API_BASE_URL}/api/generate-voiceover`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ script: state.script })
+                });
+
+                if (!voiceResponse.ok) {
+                    const errorData = await voiceResponse.json();
+                    throw new Error(errorData.error || 'Voice generation failed');
+                }
+                const voiceData = await voiceResponse.json();
+                state.audioPath = voiceData.audioPath;
+
+                updateStep('step-voice', 'done');
+                updateProgress('✅ Voice done!', 65);
+
+                // 5. Description & Tags
+                updateStep('step-description', 'active');
+                updateProgress('📋 Generating description...', 70);
+
+                const descResponse = await fetch(`${API_BASE_URL}/api/generate-description`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ script: state.script, title: state.videoTitle })
+                });
+
+                if (!descResponse.ok) throw new Error('Description generation failed');
+                const descData = await descResponse.json();
+                state.description = descData.description;
+                state.tags = descData.tags;
+
+                document.getElementById('descriptionPreview').classList.remove('hidden');
+                document.getElementById('descriptionText').value = state.description;
+                document.getElementById('tagsText').value = state.tags;
+
+                updateStep('step-description', 'done');
+                updateProgress('✅ Description done!', 75);
+
+                // 6. Video
+                updateStep('step-video', 'active');
+                updateProgress('🎬 Creating video...', 80);
+
+                const videoResponse = await fetch(`${API_BASE_URL}/api/create-video`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        imagePaths: state.images,
+                        audioPath: state.audioPath,
+                        title: state.videoTitle,
+                        script: state.script
+                    })
+                });
+
+                if (!videoResponse.ok) throw new Error('Video creation failed');
+                const videoData = await videoResponse.json();
+
+                updateStep('step-video', 'done');
+                updateProgress('✅ Complete!', 100);
+
+                // Success
+                document.getElementById('progressSection').classList.add('hidden');
+                document.getElementById('successSection').classList.remove('hidden');
+
+                document.getElementById('videoPreview').src = videoData.videoUrl;
+                document.getElementById('downloadLink').href = videoData.videoUrl;
+                document.getElementById('finalWordCount').textContent = scriptData.actualWords.toLocaleString();
+                document.getElementById('finalImageCount').textContent = state.images.length;
+
+            } catch (error) {
+                console.error('❌ Error:', error);
+                showError(`Generation failed: ${error.message}`);
+            }
+        });
+
+        updateGenerateButton();
+    </script>
+</body>
+</html>
